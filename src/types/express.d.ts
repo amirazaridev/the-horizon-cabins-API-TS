@@ -1,5 +1,3 @@
-declare global{
-    namespace Express {
-        
-    }
+declare global {
+  namespace Express {}
 }

@@ -1,0 +1,34 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+model Cabin {
+  id            Int       @id @default(autoincrement())
+  name          String    @unique
+  maxCapacity   Int       @map("max_capacity")
+  regularPrice  BigInt    @map("regular_price")
+  discount      Int       @default(0)
+  description   String
+  amenities     String[]
+  bedrooms      Int
+  bathrooms     Int
+  areaSqm       Float     @map("area_sqm")
+  images        String[]
+
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("cabins")
+}

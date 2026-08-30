@@ -3,13 +3,10 @@
     "target": "es2022",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "rootDir": "./src",
-    "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
-    // "paths": { "@/*": ["./src/"] }
+    "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": ["src", "prisma7.config.ts"]
 }

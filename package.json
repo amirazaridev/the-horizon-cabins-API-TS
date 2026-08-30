@@ -9,10 +9,10 @@
   "imports": {},
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "lint": "eslint .",
-    "format": "prettier --write"
+    "format": "prettier --write src/"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -35,7 +35,6 @@
     "@types/pg": "^8.23.1",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-n": "^18.3.0",
     "eslint-plugin-promise": "^7.3.0",
     "prettier": "^3.9.6",
