@@ -12,3 +12,9 @@ export async function comparePassword(
 export async function hashPassword(plainPassword: string): Promise<string> {
   return bcrypt.hash(plainPassword, env.BCRYPT_SALT_ROUNDS);
 }
+
+
+export function isPasswordChangedAfter(lastPasswordChange: Date, jwtIssuedAt: number): boolean {
+  const changedTimestamp = Math.floor(lastPasswordChange.getTime() / 1000);
+  return jwtIssuedAt < changedTimestamp;
+}

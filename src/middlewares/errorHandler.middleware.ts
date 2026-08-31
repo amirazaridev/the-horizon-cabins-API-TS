@@ -111,7 +111,7 @@ export const errorHandler = (err: unknown, req: Request, res: Response, _next: N
   });
 
   res.status(statusCode).json({
-    success: false,
+    status: `${statusCode}`.startsWith('4') ? 'fail' : 'error',
     code,
     message,
     ...(details ? { errors: details } : {}),
