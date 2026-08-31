@@ -13,22 +13,133 @@ datasource db {
 }
 
 
+// ================================
+// ENUMS
+// ================================
+
+enum UserRole {
+  admin
+  owner
+  guest
+
+  @@map("user_role")
+}
+
+enum Gender {
+  male
+  female
+
+  @@map("gender")
+}
+
+enum BookingStatus {
+  unconfirmed
+  checkedIn  @map("checked-in")
+  checkedOut @map("checked-out")
+
+  @@map("booking_status")
+}
+
+// ================================
+// MODELS
+// ================================
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  name               String?   @db.VarChar(255)
+  email              String    @unique @db.VarChar(100)
+  active             Boolean   @default(true)
+  password           String    @db.VarChar(255)
+  role               UserRole  @default(guest)
+  lastPasswordChange DateTime  @default(now()) @map("last_password_change")
+  loginAttempts      Int       @default(0) @map("login_attempts")
+  lastLoginAttempt   DateTime? @map("last_login_attempt")
+  lockedUntil        DateTime? @map("locked_until")
+
+  guest              Guest?
+
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Guest {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  fullName    String    @map("full_name") @db.VarChar(100)
+  phoneNumber String?   @map("phone_number") @db.VarChar(15)
+  nationalId  String?   @unique @map("national_id") @db.VarChar(20)
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
+  gender      Gender?
+
+  bookings    Booking[]
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("guests")
+}
+
 model Cabin {
-  id            Int       @id @default(autoincrement())
-  name          String    @unique
-  maxCapacity   Int       @map("max_capacity")
-  regularPrice  BigInt    @map("regular_price")
-  discount      Int       @default(0)
-  description   String
-  amenities     String[]
-  bedrooms      Int
-  bathrooms     Int
-  areaSqm       Float     @map("area_sqm")
-  images        String[]
+  id           Int       @id @default(autoincrement())
+  name         String    @unique
+  maxCapacity  Int       @map("max_capacity")
+  regularPrice BigInt    @map("regular_price")
+  discount     Int       @default(0)
+  description  String
+  amenities    String[]
+  bedrooms     Int
+  bathrooms    Int
+  areaSqm      Float     @map("area_sqm")
+  images       String[]
 
+  bookings     Booking[]
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   @@map("cabins")
+}
+
+model Booking {
+  id           Int           @id @default(autoincrement())
+
+  startDate    DateTime      @map("start_date")
+  endDate      DateTime      @map("end_date")
+  numNights    Int           @map("num_nights")
+  numGuests    Int           @map("num_guests")
+  cabinPrice   Int           @map("cabin_price")
+  extrasPrice  Int           @default(0) @map("extras_price")
+  totalPrice   BigInt           @map("total_price")
+  status       BookingStatus @default(unconfirmed)
+  hasBreakfast Boolean       @default(false) @map("has_breakfast")
+  isPaid       Boolean       @default(false) @map("is_paid")
+  observations String?       @db.Text
+
+  cabinId      Int           @map("cabin_id")
+  cabin        Cabin         @relation(fields: [cabinId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  guestId      Int           @map("guest_id")
+  guest        Guest         @relation(fields: [guestId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@map("bookings")
+}
+
+model Setting {
+  id               Int      @id @default(autoincrement())
+  minBookingLength Int      @default(1) @map("min_booking_length")
+  maxBookingLength Int      @default(30) @map("max_booking_length")
+  maxGuests        Int      @default(10) @map("max_guests")
+  breakfastPrice   Int      @default(15) @map("breakfast_price")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
 }

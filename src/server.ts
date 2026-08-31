@@ -2,7 +2,7 @@ import createApp from "./app.js";
 import { checkDatabaseConnection, disconnectDatabase } from "./config/database.js";
 import env from "./config/env.js";
 import logger from "./config/logger.js";
-
+/* eslint-disable n/no-process-exit */
 async function startServer(): Promise<void> {
   const app = createApp();
   const isDBConnected = await checkDatabaseConnection();
@@ -11,8 +11,8 @@ async function startServer(): Promise<void> {
     process.exit(1);
   }
 
-  const server = app.listen(env.port, () => {
-    logger.info(`Server running on port ${env.port} [${env.nodeEnv}]`);
+  const server = app.listen(env.PORT, () => {
+    logger.info(`Server running on port ${env.PORT} [${env.NODE_ENV}]`);
   });
   let isShuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
