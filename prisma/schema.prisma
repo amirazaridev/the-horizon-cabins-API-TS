@@ -87,7 +87,7 @@ model Cabin {
   id           Int       @id @default(autoincrement())
   name         String    @unique
   maxCapacity  Int       @map("max_capacity")
-  regularPrice BigInt    @map("regular_price")
+  regularPrice Int    @map("regular_price")
   discount     Int       @default(0)
   description  String
   amenities    String[]

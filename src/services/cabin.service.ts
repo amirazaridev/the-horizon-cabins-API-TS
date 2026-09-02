@@ -1,6 +1,6 @@
 import { AppError } from "../utils/AppError.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
-import type { Cabin, Prisma } from "../generated/prisma/client.js";
+import type { Cabin } from "../generated/prisma/client.js";
 import type { z } from "zod";
 import type { createCabinSchema, updateCabinSchema } from "../validations/cabin.validation.js";
 
@@ -18,11 +18,7 @@ export async function getCabinById(id: number): Promise<Cabin> {
 }
 
 export async function createCabin(input: CreateCabinInput): Promise<Cabin> {
-  const data: Prisma.CabinCreateInput = {
-    ...input,
-    regularPrice: BigInt(input.regularPrice),
-  };
-  return await cabinRepository.createCabin(data);
+  return await cabinRepository.createCabin(input);
 }
 
 export async function updateCabin(id: number, input: UpdateCabinInput): Promise<Cabin> {
@@ -36,12 +32,7 @@ export async function updateCabin(id: number, input: UpdateCabinInput): Promise<
     throw new AppError("The discount cannot exceed the original price.", 400);
   }
 
-  const data: Prisma.CabinUpdateInput = {
-    ...input,
-    ...(input.regularPrice !== undefined && { regularPrice: BigInt(input.regularPrice) }),
-  };
-
-  return await cabinRepository.updateCabin(id, data);
+  return await cabinRepository.updateCabin(id, input);
 }
 
 export async function deleteCabin(id: number): Promise<void> {

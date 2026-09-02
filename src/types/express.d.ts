@@ -1,9 +1,9 @@
-import { User } from "../generated/prisma/client.ts";
+import { SafeUser } from "./user.types.ts";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: Omit<User, "password">;
+      user?: SafeUser;
     }
   }
 }

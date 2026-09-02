@@ -45,7 +45,7 @@ CREATE TABLE "cabins" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "max_capacity" INTEGER NOT NULL,
-    "regular_price" BIGINT NOT NULL,
+    "regular_price" INTEGER NOT NULL,
     "discount" INTEGER NOT NULL DEFAULT 0,
     "description" TEXT NOT NULL,
     "amenities" TEXT[],

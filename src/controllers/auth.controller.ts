@@ -1,7 +1,8 @@
 import type { Request, Response, NextFunction, CookieOptions } from "express";
 import env from "../config/env.js";
 import * as authService from "../services/auth.service.js";
-import * as guestRepository from "../repositories/guest.repository.js";
+import { sendSuccess } from "../utils/apiResponse.js";
+import { HTTP_STATUS } from "../constants/httpStatus.js";
 
 function sendTokenCookie(res: Response, token: string): void {
   const cookieOptions: CookieOptions = {
@@ -22,7 +23,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     const { user, token } = await authService.login(email, password);
 
     sendTokenCookie(res, token);
-    res.status(200).json({ status: "success", data: { user } });
+    sendSuccess(res, { data: { user } });
   } catch (error) {
     next(error);
   }
@@ -30,31 +31,14 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
 export function logout(req: Request, res: Response): void {
   res.clearCookie("jwt");
-  res.status(204).json({ status: "success" });
+  sendSuccess(res, { statusCode: HTTP_STATUS.NO_CONTENT });
 }
 
 export async function signup(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { user, token } = await authService.signup(req.body);
     sendTokenCookie(res, token);
-    res.status(201).json({ status: "success", data: { user } });
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function getMe(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    if (!req.user) {
-      res.status(401).json({ status: "fail", message: "Not authenticated" });
-      return;
-    }
-
-    const guest = await guestRepository.findGuestByUserId(req.user.id);
-    const user = { ...req.user };
-    if (user.role === "guest") delete (user as Partial<typeof user>).role;
-
-    res.json({ status: "success", data: { user, guest } });
+    sendSuccess(res, { statusCode: HTTP_STATUS.CREATED, data: { user } });
   } catch (error) {
     next(error);
   }

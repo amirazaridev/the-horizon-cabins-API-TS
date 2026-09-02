@@ -1,5 +1,5 @@
-import jwt from 'jsonwebtoken';
-import env from '../config/env.js';
+import jwt from "jsonwebtoken";
+import env from "../config/env.js";
 
 export interface JwtPayload {
   id: number;

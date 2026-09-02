@@ -60,6 +60,7 @@ export const errorHandler = (err: unknown, req: Request, res: Response, _next: N
       code: issue.code,
       message: issue.message,
     }));
+    logger.info(err.issues);
   }
 
   //  خطاهای شناخته‌شده Prisma
@@ -111,7 +112,7 @@ export const errorHandler = (err: unknown, req: Request, res: Response, _next: N
   });
 
   res.status(statusCode).json({
-    status: `${statusCode}`.startsWith('4') ? 'fail' : 'error',
+    status: `${statusCode}`.startsWith("4") ? "fail" : "error",
     code,
     message,
     ...(details ? { errors: details } : {}),
