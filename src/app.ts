@@ -13,10 +13,9 @@ function createApp(): Express {
   //   app.use(helmet());
   //   app.use(cors());
   app.use(express.json());
-  app.use(cookieParser())
+  app.use(cookieParser());
 
-
-  app.use("/api/v1",routes);
+  app.use("/api/v1", routes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

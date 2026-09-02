@@ -1,6 +1,6 @@
-import { prisma } from '../config/database.js';
-import { Prisma } from '../generated/prisma/client.js';
-import type { Cabin } from '../generated/prisma/client.js';
+import { prisma } from "../config/database.js";
+import { Prisma } from "../generated/prisma/client.js";
+import type { Cabin } from "../generated/prisma/client.js";
 
 export async function findAllCabins(): Promise<Cabin[]> {
   return prisma.cabin.findMany();
@@ -22,7 +22,7 @@ export async function deleteCabin(id: number): Promise<Cabin | null> {
   try {
     return await prisma.cabin.delete({ where: { id } });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
       return null; // معادل deletedCount === 0 در Sequelize
     }
     throw error;

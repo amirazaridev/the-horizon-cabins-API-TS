@@ -1,14 +1,14 @@
-import { Router } from 'express';
-import * as cabinController from '../controllers/cabin.controller.js';
-import { validate } from '../middlewares/validate.middleware.js';
-import { protect, restrictTo } from '../middlewares/auth.middleware.js';
-import * as cabinValidation from '../validations/cabin.validation.js';
+import { Router } from "express";
+import * as cabinController from "../controllers/cabin.controller.js";
+import { validate } from "../middlewares/validate.middleware.js";
+import { protect, restrictTo } from "../middlewares/auth.middleware.js";
+import * as cabinValidation from "../validations/cabin.validation.js";
 
 const router = Router();
-const requireAdminOrOwner = [protect, restrictTo('admin', 'owner')];
+const requireAdminOrOwner = [protect, restrictTo("admin", "owner")];
 
 router
-  .route('/')
+  .route("/")
   .get(cabinController.getAll)
   .post(
     ...requireAdminOrOwner,
@@ -17,7 +17,7 @@ router
   );
 
 router
-  .route('/:id')
+  .route("/:id")
   .get(validate(cabinValidation.getCabinSchema), cabinController.getCabin)
   .delete(
     ...requireAdminOrOwner,
