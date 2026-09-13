@@ -33,7 +33,7 @@ enum Gender {
 }
 
 enum BookingStatus {
-  unconfirmed
+  confirmed
   checkedIn  @map("checked-in")
   checkedOut @map("checked-out")
 
@@ -82,11 +82,23 @@ model Guest {
   @@map("guests")
 }
 
+model City {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(100)
+
+  cabins    Cabin[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("cities")
+}
+
 model Cabin {
   id           Int       @id @default(autoincrement())
   name         String    @unique
   maxCapacity  Int       @map("max_capacity")
-  regularPrice Int    @map("regular_price")
+  regularPrice Int       @map("regular_price")
   discount     Int       @default(0)
   description  String
   amenities    String[]
@@ -94,6 +106,11 @@ model Cabin {
   bathrooms    Int
   areaSqm      Float     @map("area_sqm")
   images       String[]
+  latitude     Float?
+  longitude    Float?
+
+  cityId       Int       @map("city_id")
+  city         City      @relation(fields: [cityId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   bookings     Booking[]
 
@@ -112,9 +129,8 @@ model Booking {
   numGuests    Int           @map("num_guests")
   cabinPrice   Int           @map("cabin_price")
   extrasPrice  Int           @default(0) @map("extras_price")
-  totalPrice   BigInt           @map("total_price")
-  status       BookingStatus @default(unconfirmed)
-  hasBreakfast Boolean       @default(false) @map("has_breakfast")
+  totalPrice   BigInt        @map("total_price")
+  status       BookingStatus @default(confirmed)
   isPaid       Boolean       @default(false) @map("is_paid")
   observations String?       @db.Text
 
