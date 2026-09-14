@@ -5,7 +5,7 @@ CREATE TYPE "user_role" AS ENUM ('admin', 'owner', 'guest');
 CREATE TYPE "gender" AS ENUM ('male', 'female');
 
 -- CreateEnum
-CREATE TYPE "booking_status" AS ENUM ('unconfirmed', 'checked-in', 'checked-out');
+CREATE TYPE "booking_status" AS ENUM ('confirmed', 'checked-in', 'checked-out');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -40,6 +40,16 @@ CREATE TABLE "guests" (
 );
 
 -- CreateTable
+CREATE TABLE "cities" (
+    "id" SERIAL NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "cities_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "cabins" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
@@ -52,6 +62,10 @@ CREATE TABLE "cabins" (
     "bathrooms" INTEGER NOT NULL,
     "area_sqm" DOUBLE PRECISION NOT NULL,
     "images" TEXT[],
+    "latitude" DOUBLE PRECISION NOT NULL,
+    "longitude" DOUBLE PRECISION NOT NULL,
+    "rating" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "city_id" INTEGER NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -68,8 +82,7 @@ CREATE TABLE "bookings" (
     "cabin_price" INTEGER NOT NULL,
     "extras_price" INTEGER NOT NULL DEFAULT 0,
     "total_price" BIGINT NOT NULL,
-    "status" "booking_status" NOT NULL DEFAULT 'unconfirmed',
-    "has_breakfast" BOOLEAN NOT NULL DEFAULT false,
+    "status" "booking_status" NOT NULL DEFAULT 'confirmed',
     "is_paid" BOOLEAN NOT NULL DEFAULT false,
     "observations" TEXT,
     "cabin_id" INTEGER NOT NULL,
@@ -103,10 +116,16 @@ CREATE UNIQUE INDEX "guests_user_id_key" ON "guests"("user_id");
 CREATE UNIQUE INDEX "guests_national_id_key" ON "guests"("national_id");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "cities_name_key" ON "cities"("name");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "cabins_name_key" ON "cabins"("name");
 
 -- AddForeignKey
 ALTER TABLE "guests" ADD CONSTRAINT "guests_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "cabins" ADD CONSTRAINT "cabins_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_cabin_id_fkey" FOREIGN KEY ("cabin_id") REFERENCES "cabins"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

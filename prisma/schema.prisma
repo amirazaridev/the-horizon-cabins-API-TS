@@ -106,8 +106,9 @@ model Cabin {
   bathrooms    Int
   areaSqm      Float     @map("area_sqm")
   images       String[]
-  latitude     Float?
-  longitude    Float?
+  latitude     Float
+  longitude    Float
+  rating       Float     @default(0)
 
   cityId       Int       @map("city_id")
   city         City      @relation(fields: [cityId], references: [id], onDelete: Restrict, onUpdate: Cascade)
