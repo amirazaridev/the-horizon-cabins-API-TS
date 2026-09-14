@@ -3,6 +3,7 @@ import * as cabinController from "../controllers/cabin.controller.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import { protect, restrictTo } from "../middlewares/auth.middleware.js";
 import * as cabinValidation from "../validations/cabin.validation.js";
+import { uploadCabinImages } from "../middlewares/upload.middleware.js";
 
 const router = Router();
 const requireAdminOrOwner = [protect, restrictTo("admin", "owner")];
@@ -11,23 +12,27 @@ router
   .route("/")
   .get(cabinController.getAll)
   .post(
-    ...requireAdminOrOwner,
+    uploadCabinImages,                                  
     validate(cabinValidation.createCabinSchema),
     cabinController.createCabin,
   );
+router.route("/cities").get(cabinController.getAllCity);
+
 
 router
   .route("/:id")
   .get(validate(cabinValidation.getCabinSchema), cabinController.getCabin)
   .delete(
-    ...requireAdminOrOwner,
+    // ...requireAdminOrOwner,
     validate(cabinValidation.deleteCabinSchema),
     cabinController.deleteCabin,
   )
   .patch(
-    ...requireAdminOrOwner,
+    // ...requireAdminOrOwner,
+    uploadCabinImages,
     validate(cabinValidation.updateCabinSchema),
     cabinController.updateCabin,
   );
+
 
 export default router;

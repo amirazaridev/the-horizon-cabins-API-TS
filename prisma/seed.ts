@@ -1,10 +1,12 @@
 import { prisma } from "../src/config/database";
 import logger from "../src/config/logger";
 import { seedCabins } from "./seeds/cabin.seed";
+import { seedCities } from "./seeds/city.seed";
 
 async function main() {
   logger.info("🌱 Seeding started...");
 
+  await seedCities();
   await seedCabins();
 
   logger.info("✅ Seeding finished.");
