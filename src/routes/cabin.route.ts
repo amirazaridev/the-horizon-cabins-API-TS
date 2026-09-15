@@ -23,12 +23,13 @@ router
   .route("/:id")
   .get(validate(cabinValidation.getCabinSchema), cabinController.getCabin)
   .delete(
-    ...requireAdminOrOwner,
+    // ...requireAdminOrOwner,
     validate(cabinValidation.deleteCabinSchema),
     cabinController.deleteCabin,
   )
   .patch(
-    ...requireAdminOrOwner,
+    // ...requireAdminOrOwner,
+    uploadCabinImages,
     validate(cabinValidation.updateCabinSchema),
     cabinController.updateCabin,
   );

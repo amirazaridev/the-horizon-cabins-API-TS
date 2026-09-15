@@ -59,7 +59,7 @@ export async function removeUploadedImages(paths: string[] = []) {
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${CABINS_BUCKET}`, {
     method: "DELETE",
     headers: storageHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify(paths),
+    body: JSON.stringify({ prefixes: paths }),
   });
 
   if (!res.ok) {

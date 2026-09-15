@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { safeNumber } from "../utils/safeParseNumber.js";
+import { safeArray } from "../utils/safeArray.js";
 
 const cabinBodySchema = z.object({
   name: z
@@ -44,7 +45,10 @@ const cabinBodySchema = z.object({
     message: "Description cannot exceed 1000 characters",
   }),
 
-  amenities: z.array(z.string().trim().min(1)).default([]),
+  amenities: z.preprocess(
+  safeArray,
+  z.array(z.string().trim().min(1)).default([]),
+),
 
   bedrooms: z.preprocess(
     safeNumber,
@@ -95,11 +99,15 @@ const cabinBodySchema = z.object({
       .positive({ message: "City ID must be greater than 0" }),
   ),
 
+
   images: z
-    .array(z.string().url({ message: "Invalid image URL" }))
+    .array(z.url({ message: "Invalid image URL" }))
     .min(1, { message: "At least one image is required" }).optional(),
     
-  keepExistingImages: z.array(z.string().url({ message: "Invalid image URL" })).default([]),
+  keepExistingImages: z.preprocess(
+  safeArray,
+  z.array(z.url({ message: "Invalid image URL" })).default([]),
+),
 });
 
 const idParamsSchema = z.object({

@@ -96,4 +96,6 @@ export async function updateCabin(
 export async function deleteCabin(id: number): Promise<void> {
   const deletedCabin = await cabinRepository.deleteCabin(id);
   if (!deletedCabin) throw new AppError("Cabin not found", 404);
+
+  await removeUploadedImages((deletedCabin.images ?? []).map(extractFilePath));
 }
