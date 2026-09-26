@@ -4,13 +4,14 @@ import { validate } from "../middlewares/validate.middleware.js";
 import { protect, restrictTo } from "../middlewares/auth.middleware.js";
 import * as cabinValidation from "../validations/cabin.validation.js";
 import { uploadCabinImages } from "../middlewares/upload.middleware.js";
+import { paginationMiddleware } from "../middlewares/pagination.middleware.js";
 
 const router = Router();
 const requireAdminOrOwner = [protect, restrictTo("admin", "owner")];
 
 router
   .route("/")
-  .get(cabinController.getAll)
+  .get(paginationMiddleware, cabinController.getAll)
   .post(
     uploadCabinImages,                                  
     validate(cabinValidation.createCabinSchema),
