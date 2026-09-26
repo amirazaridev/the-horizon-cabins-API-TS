@@ -21,7 +21,7 @@ export function validate(schema: RequestValidationSchema) {
 
     if (schema.query) {
       const result = schema.query.parse(req.query);
-      req.query = result as Request["query"];
+      Object.assign(req.query, result);
     }
 
     next();

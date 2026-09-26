@@ -5,6 +5,19 @@ import { isValidIcon } from "../utils/valid-icons.util.js";
 
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+const slugSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .regex(slugRegex, { message: "Slug must be kebab-case (e.g. villa-jangali)" });
+
+export const categorySlugQueryValidation = {
+  query: z.object({
+    category: slugSchema.optional(),
+  }),
+};
+
 const categoryBodySchema = z.object({
   title: z
     .string()
