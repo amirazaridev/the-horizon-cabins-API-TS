@@ -2,20 +2,29 @@ import { prisma } from "../config/database.js";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Cabin, City } from "../generated/prisma/client.js";
 
-export async function findAllCabins() {
-  return prisma.cabin.findMany({
-    omit: {
-      cityId: true,
-    },
-    include: {
-      city: {
-        select: {
-          id: true,
-          name: true,
+export async function findAllCabins({
+  skip = 0,
+  limit = 10,
+}: { skip?: number; limit?: number } = {}) {
+  const [data, total] = await Promise.all([
+    prisma.cabin.findMany({
+      skip,
+      take: limit,
+      omit: {
+        cityId: true,
+      },
+      include: {
+        city: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.cabin.count(),
+  ]);
+  return { data, total };
 }
 export async function findAllCities(): Promise<City[]> {
   return prisma.city.findMany();
