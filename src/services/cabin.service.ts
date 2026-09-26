@@ -4,14 +4,24 @@ import type { Cabin, City } from "../generated/prisma/client.js";
 import type { z } from "zod";
 import type { createCabinSchema, updateCabinSchema } from "../validations/cabin.validation.js";
 import { extractFilePath, removeUploadedImages, uploadCabinImages } from "../utils/upload.utils.js";
+import { getPaginationMeta } from "../utils/pagination.utils.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
+import { PaginationParams } from "../types/pagination.types.js";
 
 type CreateCabinInput = z.infer<typeof createCabinSchema.body>;
 type UpdateCabinInput = z.infer<typeof updateCabinSchema.body>;
 
-export async function getAllCabins() {
-  return await cabinRepository.findAllCabins();
+export async function getAllCabins({
+  skip = 0,
+  limit = 10,
+  page = 1,
+}: PaginationParams) {
+  const { data, total } = await cabinRepository.findAllCabins({ skip, limit });
+  return {
+    cabins: data,
+    meta: getPaginationMeta(total, page, limit),
+  };
 }
 export async function getAllCities(): Promise<City[]> {
   return await cabinRepository.findAllCities();
@@ -29,14 +39,16 @@ export async function createCabin(
 ): Promise<Cabin> {
   const { cityId, keepExistingImages, ...cabinData } = input;
 
-  // ۱. آپلود
   const uploadedUrls = await uploadCabinImages(imageFiles);
 
   if (uploadedUrls.length === 0) {
-    throw new AppError("At least one image is required", HTTP_STATUS.BAD_REQUEST, ErrorCode.VALIDATION_ERROR);
+    throw new AppError(
+      "At least one image is required",
+      HTTP_STATUS.BAD_REQUEST,
+      ErrorCode.VALIDATION_ERROR,
+    );
   }
 
-  // ۲. اگر ذخیره در DB شکست خورد، عکس‌های آپلودشده را حذف کن (rollback)
   try {
     return await cabinRepository.createCabin({
       ...cabinData,
@@ -55,12 +67,17 @@ export async function updateCabin(
   imageFiles: Express.Multer.File[] = [],
 ): Promise<Cabin> {
   const existingCabin = await cabinRepository.findCabinById(id);
-  if (!existingCabin) throw new AppError(`Cabin with id ${id} not found`, HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
+  if (!existingCabin)
+    throw new AppError(`Cabin with id ${id} not found`, HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
 
   const finalPrice = input.regularPrice ?? Number(existingCabin.regularPrice);
   const finalDiscount = input.discount ?? existingCabin.discount;
   if (finalDiscount > finalPrice) {
-    throw new AppError("The discount cannot exceed the original price.", HTTP_STATUS.BAD_REQUEST, ErrorCode.VALIDATION_ERROR);
+    throw new AppError(
+      "The discount cannot exceed the original price.",
+      HTTP_STATUS.BAD_REQUEST,
+      ErrorCode.VALIDATION_ERROR,
+    );
   }
 
   const uploadedUrls = await uploadCabinImages(imageFiles);
@@ -68,7 +85,11 @@ export async function updateCabin(
 
   if (finalImages.length === 0) {
     await removeUploadedImages(uploadedUrls.map(extractFilePath));
-    throw new AppError("At least one image is required", HTTP_STATUS.BAD_REQUEST, ErrorCode.VALIDATION_ERROR);
+    throw new AppError(
+      "At least one image is required",
+      HTTP_STATUS.BAD_REQUEST,
+      ErrorCode.VALIDATION_ERROR,
+    );
   }
 
   const { cityId, keepExistingImages, ...rest } = input;
@@ -97,7 +118,8 @@ export async function updateCabin(
 
 export async function deleteCabin(id: number): Promise<void> {
   const deletedCabin = await cabinRepository.deleteCabin(id);
-  if (!deletedCabin) throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
+  if (!deletedCabin)
+    throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
 
   await removeUploadedImages((deletedCabin.images ?? []).map(extractFilePath));
 }
