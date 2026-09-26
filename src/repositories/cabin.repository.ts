@@ -6,9 +6,15 @@ import { CabinWithCity } from "../types/cabin.types.js";
 export async function findAllCabins({
   skip = 0,
   limit = 10,
-}: { skip?: number; limit?: number } = {}) {
+  categorySlug,
+}: { skip?: number; limit?: number; categorySlug?: string } = {}) {
+  const where = categorySlug
+    ? { categories: { some: { category: { slug: categorySlug } } } }
+    : undefined;
+
   const [data, total] = await Promise.all([
     prisma.cabin.findMany({
+      where,
       skip,
       take: limit,
       omit: {
@@ -23,9 +29,34 @@ export async function findAllCabins({
         },
       },
     }),
-    prisma.cabin.count(),
+    prisma.cabin.count({ where }),
   ]);
   return { data: data as CabinWithCity[], total };
+}
+
+export async function findCabinCategories(cabinId: number) {
+  return prisma.cabinCategory.findMany({
+    where: { cabinId },
+    include: { category: true },
+  });
+}
+
+export async function removeCabinCategory(cabinId: number, categoryId: number): Promise<void> {
+  await prisma.cabinCategory.delete({
+    where: { cabinId_categoryId: { cabinId, categoryId } },
+  });
+}
+
+export async function setCategoriesForCabin(
+  cabinId: number,
+  categoryIds: number[],
+): Promise<void> {
+  await prisma.$transaction([
+    prisma.cabinCategory.deleteMany({ where: { cabinId } }),
+    prisma.cabinCategory.createMany({
+      data: categoryIds.map((categoryId) => ({ cabinId, categoryId })),
+    }),
+  ]);
 }
 export async function findAllCities(): Promise<City[]> {
   return prisma.city.findMany();

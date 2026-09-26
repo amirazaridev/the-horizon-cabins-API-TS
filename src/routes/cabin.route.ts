@@ -1,36 +1,43 @@
 import { Router } from "express";
 import * as cabinController from "../controllers/cabin.controller.js";
 import { validate } from "../middlewares/validate.middleware.js";
-import { protect, restrictTo } from "../middlewares/auth.middleware.js";
 import * as cabinValidation from "../validations/cabin.validation.js";
-import { uploadCabinImages } from "../middlewares/upload.middleware.js";
+import * as categoryValidation from "../validations/category.validation.js";
 import { paginationMiddleware } from "../middlewares/pagination.middleware.js";
 
 const router = Router();
-const requireAdminOrOwner = [protect, restrictTo("admin", "owner")];
 
 router
   .route("/")
   .get(paginationMiddleware, cabinController.getAll)
   .post(
-    uploadCabinImages,                                  
-    validate(cabinValidation.createCabinSchema),
     cabinController.createCabin,
   );
 router.route("/cities").get(cabinController.getAllCity);
 
+router
+  .route("/:id/categories")
+  .get(cabinController.getCabinCategories)
+  .post(
+    validate(categoryValidation.assignCategoriesSchema),
+    cabinController.setCabinCategories,
+  );
+
+router
+  .route("/:id/categories/:categoryId")
+  .delete(
+    validate(categoryValidation.cabinCategoryIdParamsSchema),
+    cabinController.removeCabinCategory,
+  );
 
 router
   .route("/:id")
   .get(validate(cabinValidation.getCabinSchema), cabinController.getCabin)
   .delete(
-    // ...requireAdminOrOwner,
     validate(cabinValidation.deleteCabinSchema),
     cabinController.deleteCabin,
   )
   .patch(
-    // ...requireAdminOrOwner,
-    uploadCabinImages,
     validate(cabinValidation.updateCabinSchema),
     cabinController.updateCabin,
   );
