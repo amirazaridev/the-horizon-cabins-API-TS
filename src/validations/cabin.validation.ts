@@ -77,7 +77,7 @@ const cabinBodySchema = z.object({
       .number()
       .min(-90, { message: "Latitude must be between -90 and 90" })
       .max(90, { message: "Latitude must be between -90 and 90" }),
-  ).default(1).optional(),
+  ).default(1),
 
   longitude: z.preprocess(
     safeNumber,
@@ -89,7 +89,7 @@ const cabinBodySchema = z.object({
       .max(180, {
         message: "Longitude must be between -180 and 180",
       }),
-  ).default(1).optional(),
+  ).default(1),
 
   cityId: z.preprocess(
     safeNumber,
@@ -100,9 +100,9 @@ const cabinBodySchema = z.object({
   ),
 
 
-  images: z
-    .array(z.url({ message: "Invalid image URL" }))
-    .min(1, { message: "At least one image is required" }).optional(),
+  // images: z
+  //   .array(z.url({ message: "Invalid image URL" }))
+  //   .min(1, { message: "At least one image is required" }).optional(),
     
   keepExistingImages: z.preprocess(
   safeArray,
