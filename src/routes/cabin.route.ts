@@ -4,24 +4,25 @@ import { validate } from "../middlewares/validate.middleware.js";
 import * as cabinValidation from "../validations/cabin.validation.js";
 import * as categoryValidation from "../validations/category.validation.js";
 import { paginationMiddleware } from "../middlewares/pagination.middleware.js";
+import { paginationQueryValidation } from "../validations/pagination.validation.js";
 
 const router = Router();
 
 router
   .route("/")
-  .get(paginationMiddleware, cabinController.getAll)
-  .post(
-    cabinController.createCabin,
-  );
+  .get(
+    validate(paginationQueryValidation),
+    validate(categoryValidation.categorySlugQueryValidation),
+    paginationMiddleware,
+    cabinController.getAll,
+  )
+  .post(cabinController.createCabin);
 router.route("/cities").get(cabinController.getAllCity);
 
 router
   .route("/:id/categories")
   .get(cabinController.getCabinCategories)
-  .post(
-    validate(categoryValidation.assignCategoriesSchema),
-    cabinController.setCabinCategories,
-  );
+  .post(validate(categoryValidation.assignCategoriesSchema), cabinController.setCabinCategories);
 
 router
   .route("/:id/categories/:categoryId")
@@ -33,14 +34,7 @@ router
 router
   .route("/:id")
   .get(validate(cabinValidation.getCabinSchema), cabinController.getCabin)
-  .delete(
-    validate(cabinValidation.deleteCabinSchema),
-    cabinController.deleteCabin,
-  )
-  .patch(
-    validate(cabinValidation.updateCabinSchema),
-    cabinController.updateCabin,
-  );
-
+  .delete(validate(cabinValidation.deleteCabinSchema), cabinController.deleteCabin)
+  .patch(validate(cabinValidation.updateCabinSchema), cabinController.updateCabin);
 
 export default router;

@@ -4,7 +4,7 @@ import { sendSuccess } from "../utils/apiResponse.js";
 
 export async function getAll(req: Request, res: Response): Promise<void> {
   const { skip, limit, page } = req.pagination!;
-  const categorySlug = typeof req.query.category === "string" ? req.query.category : undefined;
+  const categorySlug = req.query.category as string | undefined;
   const result = await cabinService.getAllCabins({ skip, limit, page, categorySlug });
   sendSuccess(res, { data: result });
 }
