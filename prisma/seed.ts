@@ -2,12 +2,16 @@ import { prisma } from "../src/config/database";
 import logger from "../src/config/logger";
 import { seedCabins } from "./seeds/cabin.seed";
 import { seedCities } from "./seeds/city.seed";
+import { seedCategories } from "./seeds/category.seed";
+import { seedCabinCategories } from "./seeds/cabin-category.seed";
 
 async function main() {
   logger.info("🌱 Seeding started...");
 
   await seedCities();
+  await seedCategories();
   await seedCabins();
+  await seedCabinCategories();
 
   logger.info("✅ Seeding finished.");
 }
