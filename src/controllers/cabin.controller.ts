@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import * as cabinService from "../services/cabin.service.js";
-import { toCabinDto } from "../utils/cabin.utils.js";
 import { sendSuccess } from "../utils/apiResponse.js";
 
 export async function getAll(req: Request, res: Response): Promise<void> {

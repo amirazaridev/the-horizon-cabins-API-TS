@@ -8,6 +8,8 @@ import {
   IMAGE_FIELD_NAME,
 } from "../constants/upload.constants.js";
 import { NextFunction, Response, Request } from "express";
+import { ErrorCode } from "../constants/errorCodes.js";
+import { HTTP_STATUS } from "../constants/httpStatus.js";
 
 const upload = multer({
   storage: multer.memoryStorage(), // buffer مستقیم به Supabase می‌ره
@@ -17,7 +19,7 @@ const upload = multer({
   },
   fileFilter: (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      return cb(new AppError("فقط فایل‌های تصویری (JPEG/PNG/WebP/AVIF) مجاز هستند.", 400));
+      return cb(new AppError("فقط فایل‌های تصویری (JPEG/PNG/WebP/AVIF) مجاز هستند.", HTTP_STATUS.BAD_REQUEST, ErrorCode.VALIDATION_ERROR));
     }
     cb(null, true);
   },

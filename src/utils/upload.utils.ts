@@ -4,6 +4,8 @@ import path from "path";
 import { AppError } from "./AppError.js";
 import env from "../config/env.js";
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "../constants/upload.constants.js";
+import { ErrorCode } from "../constants/errorCodes.js";
+import { HTTP_STATUS } from "../constants/httpStatus.js";
 
 const SUPABASE_URL = env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
@@ -28,7 +30,7 @@ export function extractFilePath(publicUrl: string) {
 
 async function uploadSingleImage(file: Express.Multer.File) {
   if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-    throw new AppError(`فرمت ${file.mimetype} پشتیبانی نمی‌شود.`, 400);
+    throw new AppError(`فرمت ${file.mimetype} پشتیبانی نمی‌شود.`, HTTP_STATUS.BAD_REQUEST, ErrorCode.VALIDATION_ERROR);
   }
 
   const ext = path.extname(file.originalname) || ".jpg";
@@ -47,7 +49,7 @@ async function uploadSingleImage(file: Express.Multer.File) {
   if (!res.ok) {
     const errorBody = await res.text().catch(() => "");
     console.error(`Supabase upload failed (${res.status}):`, errorBody);
-    throw new AppError("آپلود تصویر ناموفق بود.", 500);
+    throw new AppError("آپلود تصویر ناموفق بود.", HTTP_STATUS.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR);
   }
 
   return buildPublicUrl(filePath);
@@ -76,7 +78,7 @@ export async function uploadCabinImages(files: Express.Multer.File[] = []) {
   for (const file of files) {
     if (file.size > MAX_FILE_SIZE) {
       await removeUploadedImages(uploadedPaths);
-      throw new AppError("حجم هر تصویر نباید بیشتر از ۵ مگابایت باشد.", 400);
+      throw new AppError("حجم هر تصویر نباید بیشتر از ۵ مگابایت باشد.", HTTP_STATUS.BAD_REQUEST, ErrorCode.VALIDATION_ERROR);
     }
 
     try {

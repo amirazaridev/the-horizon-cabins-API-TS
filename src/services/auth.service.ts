@@ -25,8 +25,12 @@ export async function login(
       ErrorCode.UNAUTHORIZED,
     );
 
+  if (user.lockedUntil && user.lockedUntil <= new Date()) {
+    await userService.resetLoginAttempts(user.id);
+  }
+
   if (user.lockedUntil && user.lockedUntil > new Date()) {
-    throw new AppError("Account is locked. Please try again later.", HTTP_STATUS.FORBIDDEN);
+    throw new AppError("Account is locked. Please try again later.", HTTP_STATUS.FORBIDDEN, ErrorCode.FORBIDDEN);
   }
 
   const { password: pw, ...safeUser } = user;
@@ -69,12 +73,13 @@ export async function verifyUserFromToken(
   if (!currentUser) {
     throw new AppError(
       "The user belonging to this token does no longer exist. Please log in again",
-      401,
+      HTTP_STATUS.UNAUTHORIZED,
+      ErrorCode.UNAUTHORIZED,
     );
   }
 
   if (isPasswordChangedAfter(currentUser.lastPasswordChange, tokenIssuedAt)) {
-    throw new AppError("User recently changed password! Please log in again.", 401);
+    throw new AppError("User recently changed password! Please log in again.", HTTP_STATUS.UNAUTHORIZED, ErrorCode.UNAUTHORIZED);
   }
 
   return currentUser;

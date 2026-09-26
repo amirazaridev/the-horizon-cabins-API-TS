@@ -1,4 +1,4 @@
-// src/middlewares/errorHandler.middleware.ts
+import multer from "multer";
 import { Request, Response, NextFunction } from "express";
 import { ZodError } from "zod";
 // import { Prisma } from "../generated/prisma/client";
@@ -97,6 +97,11 @@ export const errorHandler = (err: unknown, req: Request, res: Response, _next: N
     statusCode = HTTP_STATUS.BAD_REQUEST;
     code = ErrorCode.INVALID_JSON;
     message = "Malformed JSON in request body";
+    isOperational = true;
+  } else if (err instanceof multer.MulterError) {
+    statusCode = HTTP_STATUS.BAD_REQUEST;
+    code = ErrorCode.VALIDATION_ERROR;
+    message = err.message;
     isOperational = true;
   } else if (err instanceof Error && env.NODE_ENV !== "production") {
     message = err.message;
