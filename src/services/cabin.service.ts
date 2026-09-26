@@ -7,7 +7,8 @@ import { extractFilePath, removeUploadedImages, uploadCabinImages } from "../uti
 import { getPaginationMeta } from "../utils/pagination.utils.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
-import { PaginationParams } from "../types/pagination.types.js";
+import { PaginatedResult, PaginationParams } from "../types/pagination.types.js";
+import { CabinWithCity } from "../types/cabin.types.js";
 
 type CreateCabinInput = z.infer<typeof createCabinSchema.body>;
 type UpdateCabinInput = z.infer<typeof updateCabinSchema.body>;
@@ -16,10 +17,10 @@ export async function getAllCabins({
   skip = 0,
   limit = 10,
   page = 1,
-}: PaginationParams) {
+}: PaginationParams): Promise<PaginatedResult<CabinWithCity>> {
   const { data, total } = await cabinRepository.findAllCabins({ skip, limit });
   return {
-    cabins: data,
+    data,
     meta: getPaginationMeta(total, page, limit),
   };
 }

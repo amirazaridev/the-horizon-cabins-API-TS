@@ -1,6 +1,7 @@
 import { prisma } from "../config/database.js";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Cabin, City } from "../generated/prisma/client.js";
+import { CabinWithCity } from "../types/cabin.types.js";
 
 export async function findAllCabins({
   skip = 0,
@@ -24,7 +25,7 @@ export async function findAllCabins({
     }),
     prisma.cabin.count(),
   ]);
-  return { data, total };
+  return { data: data as CabinWithCity[], total };
 }
 export async function findAllCities(): Promise<City[]> {
   return prisma.city.findMany();
