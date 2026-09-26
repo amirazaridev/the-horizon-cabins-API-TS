@@ -1,6 +1,7 @@
 import { AppError } from "../utils/AppError.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
-import type { Cabin, City } from "../generated/prisma/client.js";
+import * as categoryRepository from "../repositories/category.repository.js";
+import type { Cabin, City, Category } from "../generated/prisma/client.js";
 import type { z } from "zod";
 import type { createCabinSchema, updateCabinSchema } from "../validations/cabin.validation.js";
 import { extractFilePath, removeUploadedImages, uploadCabinImages } from "../utils/upload.utils.js";
@@ -13,17 +14,24 @@ import { CabinWithCity } from "../types/cabin.types.js";
 type CreateCabinInput = z.infer<typeof createCabinSchema.body>;
 type UpdateCabinInput = z.infer<typeof updateCabinSchema.body>;
 
-export async function getAllCabins({
-  skip = 0,
-  limit = 10,
-  page = 1,
-}: PaginationParams): Promise<PaginatedResult<CabinWithCity>> {
-  const { data, total } = await cabinRepository.findAllCabins({ skip, limit });
+type GetAllCabinsParams = {
+  skip?: number;
+  limit?: number;
+  page?: number;
+  categorySlug?: string;
+};
+
+export async function getAllCabins(
+  params: GetAllCabinsParams = {},
+): Promise<PaginatedResult<CabinWithCity>> {
+  const { skip = 0, limit = 10, page = 1, categorySlug } = params;
+  const { data, total } = await cabinRepository.findAllCabins({ skip, limit, categorySlug });
   return {
     data,
     meta: getPaginationMeta(total, page, limit),
   };
 }
+
 export async function getAllCities(): Promise<City[]> {
   return await cabinRepository.findAllCities();
 }
@@ -32,6 +40,42 @@ export async function getCabinById(id: number): Promise<Cabin> {
   const cabin = await cabinRepository.findCabinById(id);
   if (!cabin) throw new AppError("Cabin not found!", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
   return cabin;
+}
+
+export async function getCabinCategories(cabinId: number): Promise<Category[]> {
+  const cabin = await cabinRepository.findCabinById(cabinId);
+  if (!cabin) throw new AppError("Cabin not found!", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
+
+  const cabinCategories = await cabinRepository.findCabinCategories(cabinId);
+  return cabinCategories.map((cc) => cc.category);
+}
+
+export async function setCabinCategories(cabinId: number, categoryIds: number[]): Promise<void> {
+  const cabin = await cabinRepository.findCabinById(cabinId);
+  if (!cabin) throw new AppError("Cabin not found!", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
+
+  const uniqueIds = [...new Set(categoryIds)];
+  const existingCategories = await categoryRepository.findCategoriesByIds(uniqueIds);
+  if (existingCategories.length !== uniqueIds.length) {
+    throw new AppError(
+      "One or more categories are invalid",
+      HTTP_STATUS.BAD_REQUEST,
+      ErrorCode.VALIDATION_ERROR,
+    );
+  }
+
+  await cabinRepository.setCategoriesForCabin(cabinId, uniqueIds);
+}
+
+export async function removeCabinCategory(cabinId: number, categoryId: number): Promise<void> {
+  const cabin = await cabinRepository.findCabinById(cabinId);
+  if (!cabin) throw new AppError("Cabin not found!", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
+
+  const category = await categoryRepository.findCategoryById(categoryId);
+  if (!category)
+    throw new AppError("Category not found!", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
+
+  await cabinRepository.removeCabinCategory(cabinId, categoryId);
 }
 
 export async function createCabin(
@@ -102,7 +146,6 @@ export async function updateCabin(
       ...(cityId !== undefined && { city: { connect: { id: cityId } } }),
     });
 
-    // 🧹 عکس‌های قدیمی که کاربر حذف کرده → از storage هم پاک کن
     const removedImages = (existingCabin.images ?? []).filter(
       (oldUrl) => !finalImages.includes(oldUrl),
     );
