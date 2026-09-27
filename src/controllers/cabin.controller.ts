@@ -5,8 +5,13 @@ import { sendSuccess } from "../utils/apiResponse.js";
 export async function getAll(req: Request, res: Response): Promise<void> {
   const { skip, limit, page } = req.pagination!;
   const categorySlug = req.query.category as string | undefined;
-  const result = await cabinService.getAllCabins({ skip, limit, page, categorySlug });
-  sendSuccess(res, { data: result });
+  const { data: cabins, meta } = await cabinService.getAllCabins({
+    skip,
+    limit,
+    page,
+    categorySlug,
+  });
+  sendSuccess(res, { data: { cabins, meta } });
 }
 export async function getAllCity(req: Request, res: Response) {
   const cities = await cabinService.getAllCities();
