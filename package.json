@@ -16,6 +16,7 @@
     "start": "node dist/server.js",
     "lint": "eslint .",
     "format": "prettier --write src/",
+    "test": "vitest run",
     "prisma:reset-migrate": "prisma migrate reset",
     "prisma:generate": "prisma generate"
   },
@@ -25,11 +26,13 @@
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
+    "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
+    "node-cron": "^4.6.0",
     "pg": "^8.23.0",
     "winston": "^3.19.0",
     "zod": "^4.5.2"
@@ -51,6 +54,7 @@
     "prisma": "^7.10.0",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.68.0"
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^5.0.2"
   }
 }

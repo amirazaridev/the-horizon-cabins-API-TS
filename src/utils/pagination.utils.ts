@@ -13,11 +13,7 @@ export function getPagination(
   return { page, limit, skip };
 }
 
-export function getPaginationMeta(
-  totalItems: number,
-  page: number,
-  limit: number,
-): PaginationMeta {
+export function getPaginationMeta(totalItems: number, page: number, limit: number): PaginationMeta {
   const totalPages = Math.ceil(totalItems / limit);
   return {
     totalItems,

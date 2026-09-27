@@ -33,11 +33,21 @@ enum Gender {
 }
 
 enum BookingStatus {
-  confirmed
-  checkedIn  @map("checked-in")
-  checkedOut @map("checked-out")
+  pending     // تازه ساخته شده، منتظر پرداخته
+  confirmed   // پرداخت انجام شده
+  cancelled   // یا timeout خورده یا خود کاربر/ادمین لغو کرده
+  checkedIn   @map("checked-in")
+  checkedOut  @map("checked-out")
 
   @@map("booking_status")
+}
+
+enum CancellationReason {
+  paymentExpired  @map("payment_expired")
+  userCancelled   @map("user_cancelled")
+  adminCancelled  @map("admin_cancelled")
+
+  @@map("cancellation_reason")
 }
 
 // ================================
@@ -167,28 +177,37 @@ model CabinCategory {
 }
 
 model Booking {
-  id           Int           @id @default(autoincrement())
+  id                 Int                 @id @default(autoincrement())
 
-  startDate    DateTime      @map("start_date")
-  endDate      DateTime      @map("end_date")
-  numNights    Int           @map("num_nights")
-  numGuests    Int           @map("num_guests")
-  cabinPrice   Int           @map("cabin_price")
-  extrasPrice  Int           @default(0) @map("extras_price")
-  totalPrice   BigInt        @map("total_price")
-  status       BookingStatus @default(confirmed)
-  isPaid       Boolean       @default(false) @map("is_paid")
-  observations String?       @db.Text
+  startDate          DateTime            @map("start_date")
+  endDate            DateTime            @map("end_date")
+  numNights          Int                 @map("num_nights")
+  numGuests          Int                 @map("num_guests")
 
-  cabinId      Int           @map("cabin_id")
-  cabin        Cabin         @relation(fields: [cabinId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  cabinPrice         Int                 @map("cabin_price")
+  totalPrice         BigInt              @map("total_price")
 
-  guestId      Int           @map("guest_id")
-  guest        Guest         @relation(fields: [guestId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  status             BookingStatus       @default(pending)
+  paymentDeadline    DateTime?           @map("payment_deadline")
+  paidAt             DateTime?           @map("paid_at")
+  paymentReference   String?             @map("payment_reference")
 
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+  cancelledAt        DateTime?           @map("cancelled_at")
+  cancellationReason CancellationReason? @map("cancellation_reason")
 
+  observations       String?             @db.Text
+
+  cabinId            Int                 @map("cabin_id")
+  cabin              Cabin               @relation(fields: [cabinId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  guestId            Int                 @map("guest_id")
+  guest              Guest               @relation(fields: [guestId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  @@index([cabinId, startDate, endDate])
+  @@index([status, paymentDeadline])
   @@map("bookings")
 }
 
