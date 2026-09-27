@@ -23,6 +23,11 @@ export async function getAllCity(req: Request, res: Response) {
   sendSuccess(res, { data: { cities } });
 }
 
+export async function getAllAmenities(req: Request, res: Response) {
+  const amenities = await cabinService.getAllAmenities();
+  sendSuccess(res, { data: { amenities } });
+}
+
 export async function getCabin(req: Request, res: Response): Promise<void> {
   const id = Number(req.params.id);
   const cabin = await cabinService.getCabinById(id);

@@ -42,6 +42,10 @@ export async function getAllCities(): Promise<City[]> {
   return await cabinRepository.findAllCities();
 }
 
+export async function getAllAmenities(): Promise<string[]> {
+  return await cabinRepository.findAllAmenities();
+}
+
 export async function getCabinById(id: number): Promise<Cabin> {
   const cabin = await cabinRepository.findCabinById(id);
   if (!cabin) throw new AppError("Cabin not found!", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);

@@ -125,6 +125,14 @@ export async function findAllCities(): Promise<City[]> {
   return prisma.city.findMany();
 }
 
+export async function findAllAmenities(): Promise<string[]> {
+  const cabins = await prisma.cabin.findMany({
+    select: { amenities: true },
+  });
+  const amenities = cabins.flatMap((cabin) => cabin.amenities);
+  return [...new Set(amenities)];
+}
+
 export async function findCabinById(id: number): Promise<Cabin | null> {
   return prisma.cabin.findUnique({ where: { id } });
 }
