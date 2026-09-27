@@ -11,8 +11,7 @@ const router = Router();
 router
   .route("/")
   .get(
-    validate(paginationQueryValidation),
-    validate(categoryValidation.categorySlugQueryValidation),
+    validate(cabinValidation.listCabinsQueryValidation),
     paginationMiddleware,
     cabinController.getAll,
   )

@@ -6,6 +6,7 @@ declare global {
     interface Request {
       user?: SafeUser;
       pagination?: PaginationParams;
+      parseQuery?: unknown;
     }
   }
 }

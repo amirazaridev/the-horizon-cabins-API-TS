@@ -1,16 +1,79 @@
 import { prisma } from "../config/database.js";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Cabin, City } from "../generated/prisma/client.js";
-import { CabinWithCity } from "../types/cabin.types.js";
+import { CabinFilters, CabinWithCity } from "../types/cabin.types.js";
+
+interface FindAllCabinsParams {
+  skip?: number;
+  limit?: number;
+  categorySlug?: string;
+  filters?: CabinFilters;
+}
+
+function buildWhereClause(
+  categorySlug?: string,
+  filters?: CabinFilters,
+): Prisma.CabinWhereInput {
+  const conditions: Prisma.CabinWhereInput[] = [];
+
+  if (categorySlug) {
+    conditions.push({ categories: { some: { category: { slug: categorySlug } } } });
+  }
+
+  if (filters) {
+    if (filters.guests !== undefined) {
+      conditions.push({ maxCapacity: { gte: filters.guests } });
+    }
+
+    if (filters.bedrooms !== undefined) {
+      conditions.push({ bedrooms: { gte: filters.bedrooms } });
+    }
+
+    if (filters.cityId !== undefined) {
+      conditions.push({ cityId: filters.cityId });
+    }
+
+    if (filters.amenities && filters.amenities.length > 0) {
+      conditions.push({ amenities: { hasEvery: filters.amenities } });
+    }
+  }
+
+  if (conditions.length === 0) return {};
+  if (conditions.length === 1) return conditions[0];
+  return { AND: conditions };
+}
 
 export async function findAllCabins({
   skip = 0,
   limit = 10,
   categorySlug,
-}: { skip?: number; limit?: number; categorySlug?: string } = {}) {
-  const where = categorySlug
-    ? { categories: { some: { category: { slug: categorySlug } } } }
-    : undefined;
+  filters,
+}: FindAllCabinsParams = {}) {
+  const where = buildWhereClause(categorySlug, filters);
+  const needsPriceFilter = filters?.price !== undefined;
+
+  if (needsPriceFilter) {
+    const allCabins = await prisma.cabin.findMany({
+      where,
+      omit: { cityId: true },
+      include: {
+        city: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    const { min, max } = filters.price!;
+    const filtered = allCabins.filter((cabin) => {
+      const finalPrice = cabin.regularPrice - cabin.discount;
+      return finalPrice >= min && finalPrice <= max;
+    });
+
+    const total = filtered.length;
+    const paginated = filtered.slice(skip, skip + limit);
+
+    return { data: paginated as CabinWithCity[], total };
+  }
 
   const [data, total] = await Promise.all([
     prisma.cabin.findMany({
@@ -79,7 +142,7 @@ export async function deleteCabin(id: number): Promise<Cabin | null> {
     return await prisma.cabin.delete({ where: { id } });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      return null; // معادل deletedCount === 0 در Sequelize
+      return null;
     }
     throw error;
   }
