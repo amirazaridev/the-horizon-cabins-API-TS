@@ -10,10 +10,7 @@ interface FindAllCabinsParams {
   filters?: CabinFilters;
 }
 
-function buildWhereClause(
-  categorySlug?: string,
-  filters?: CabinFilters,
-): Prisma.CabinWhereInput {
+function buildWhereClause(categorySlug?: string, filters?: CabinFilters): Prisma.CabinWhereInput {
   const conditions: Prisma.CabinWhereInput[] = [];
 
   if (categorySlug) {
@@ -110,10 +107,7 @@ export async function removeCabinCategory(cabinId: number, categoryId: number): 
   });
 }
 
-export async function setCategoriesForCabin(
-  cabinId: number,
-  categoryIds: number[],
-): Promise<void> {
+export async function setCategoriesForCabin(cabinId: number, categoryIds: number[]): Promise<void> {
   await prisma.$transaction([
     prisma.cabinCategory.deleteMany({ where: { cabinId } }),
     prisma.cabinCategory.createMany({
