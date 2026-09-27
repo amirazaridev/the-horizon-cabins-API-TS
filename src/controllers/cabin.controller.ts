@@ -1,15 +1,20 @@
 import type { Request, Response } from "express";
 import * as cabinService from "../services/cabin.service.js";
 import { sendSuccess } from "../utils/apiResponse.js";
+import type { CabinFilters } from "../types/cabin.types.js";
 
 export async function getAll(req: Request, res: Response): Promise<void> {
   const { skip, limit, page } = req.pagination!;
-  const categorySlug = req.query.category as string | undefined;
+  const { parseQuery } = req;
+  const { category: categorySlug } = parseQuery as unknown as { category?: string };
+  const filters = parseQuery as unknown as CabinFilters;
+  console.log(filters);
   const { data: cabins, meta } = await cabinService.getAllCabins({
     skip,
     limit,
     page,
     categorySlug,
+    filters,
   });
   sendSuccess(res, { data: { cabins, meta } });
 }
