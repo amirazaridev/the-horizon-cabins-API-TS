@@ -1,11 +1,12 @@
-import { addMinutes, isAfter, isBefore, isPast } from "date-fns";
+import { addMinutes, isAfter, isPast } from "date-fns";
 import { randomUUID } from "crypto";
 import { Prisma } from "../generated/prisma/client.js";
-import type { Booking, BookingStatus, UserRole } from "../generated/prisma/client.js";
+import type { Booking, UserRole } from "../generated/prisma/client.js";
 import { AppError } from "../utils/AppError.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
-import { getBookingSettings, VALID_STATUS_TRANSITIONS } from "../constants/booking.constants.js";
+import { getBookingSettings } from "../constants/booking.constants.js";
+import { isValidStatusTransition } from "../utils/booking-status.util.js";
 import {
   calculateCabinPrice,
   calculateNumNights,
@@ -22,29 +23,27 @@ import type {
 } from "../validations/booking.validation.js";
 import type { PaginatedResult, PaginationParams } from "../types/pagination.types.js";
 import { getPaginationMeta } from "../utils/pagination.utils.js";
-import { BookingFilters } from "../types/booking.types.js";
+import type { BookedDatesQuery, BookingFilters } from "../types/booking.types.js";
 
 type CreateBookingInput = z.infer<typeof createBookingSchema.body>;
 type UpdateStatusInput = z.infer<typeof updateBookingStatusSchema.body>;
 
-
-
-export function isValidStatusTransition(current: BookingStatus, target: BookingStatus): boolean {
-  return VALID_STATUS_TRANSITIONS[current]?.includes(target) ?? false;
-}
-
-export function hasOverlappingBooking(
-  existingBookings: Array<{ startDate: Date; endDate: Date }>,
-  startDate: Date,
-  endDate: Date,
-): boolean {
-  return existingBookings.some(
-    (booking) => isBefore(booking.startDate, endDate) && isAfter(booking.endDate, startDate),
-  );
+export function hasFullBookingAccess(role: UserRole): boolean {
+  return role === "admin" || role === "owner";
 }
 
 function simulatePaymentGateway(): string {
   return randomUUID();
+}
+
+function assertBookingOwnership(booking: Booking & { guest: { userId: number } }, userId: number) {
+  if (booking.guest.userId !== userId) {
+    throw new AppError(
+      "You do not have permission to access this booking",
+      HTTP_STATUS.FORBIDDEN,
+      ErrorCode.BOOKING_FORBIDDEN,
+    );
+  }
 }
 
 export async function createBooking(input: CreateBookingInput, userId: number): Promise<Booking> {
@@ -99,7 +98,7 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
   const totalPrice = calculateTotalPrice(cabinPrice, numNights);
   const paymentDeadline = addMinutes(new Date(), settings.paymentDeadlineMinutes);
 
-  const booking = await prisma.$transaction(
+  return prisma.$transaction(
     async (tx) => {
       const overlapping = await bookingRepository.findOverlappingBooking(
         input.cabinId,
@@ -116,10 +115,7 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
         );
       }
 
-      const pendingCount = await bookingRepository.countPendingBookingsForGuest(
-        guest.id,
-        tx,
-      );
+      const pendingCount = await bookingRepository.countPendingBookingsForGuest(guest.id, tx);
 
       if (pendingCount >= settings.maxPendingBookingsPerGuest) {
         throw new AppError(
@@ -129,7 +125,8 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
         );
       }
 
-      return bookingRepository.createBooking({
+      return bookingRepository.createBooking(
+        {
           startDate: input.startDate,
           endDate: input.endDate,
           numNights,
@@ -142,12 +139,11 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
           cabin: { connect: { id: input.cabinId } },
           guest: { connect: { id: guest.id } },
         },
+        tx,
       );
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );
-
-  return booking;
 }
 
 export async function getAllBookings(
@@ -179,15 +175,8 @@ export async function getBookingById(
     throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
   }
 
-  if (hasFullBookingAccess(role) && booking.guest.userId !== userId) {
-    const guest = await guestRepository.findGuestByUserId(userId);
-    if (!guest || booking.guestId !== guest.id) {
-      throw new AppError(
-        "You do not have permission to view this booking",
-        HTTP_STATUS.FORBIDDEN,
-        ErrorCode.BOOKING_FORBIDDEN,
-      );
-    }
+  if (!hasFullBookingAccess(role)) {
+    assertBookingOwnership(booking, userId);
   }
 
   return booking;
@@ -199,17 +188,11 @@ export async function payBooking(id: number, userId: number): Promise<Booking> {
     throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
   }
 
-  if (booking.guest.userId !== userId) {
-    throw new AppError(
-      "You do not have permission to pay for this booking",
-      HTTP_STATUS.FORBIDDEN,
-      ErrorCode.BOOKING_FORBIDDEN,
-    );
-  }
+  assertBookingOwnership(booking, userId);
 
   if (booking.status !== "pending") {
     throw new AppError(
-      "این رزرو قبلاً پردازش شده است",
+      "This booking has already been processed",
       HTTP_STATUS.BAD_REQUEST,
       ErrorCode.BOOKING_ALREADY_PROCESSED,
     );
@@ -217,7 +200,7 @@ export async function payBooking(id: number, userId: number): Promise<Booking> {
 
   if (booking.paymentDeadline && isPast(booking.paymentDeadline)) {
     throw new AppError(
-      "مهلت پرداخت این رزرو گذشته است",
+      "The payment deadline for this booking has passed",
       HTTP_STATUS.BAD_REQUEST,
       ErrorCode.BOOKING_EXPIRED,
     );
@@ -237,14 +220,8 @@ export async function cancelBooking(id: number, userId: number): Promise<Booking
   if (!booking) {
     throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
   }
-  
-  if (booking.guest.userId !== userId) {
-    throw new AppError(
-      "You do not have permission to cancel this booking",
-      HTTP_STATUS.FORBIDDEN,
-      ErrorCode.BOOKING_FORBIDDEN,
-    );
-  }
+
+  assertBookingOwnership(booking, userId);
 
   if (booking.status !== "pending") {
     throw new AppError(
@@ -281,6 +258,32 @@ export async function updateBookingStatus(id: number, input: UpdateStatusInput):
 export async function expirePendingBookings(): Promise<number> {
   return bookingRepository.expirePendingBookings(new Date());
 }
-export function hasFullBookingAccess(role: UserRole): boolean {
-  return role === "admin" || role === "owner";
+
+export interface BookedRangeResult {
+  startDate: Date;
+  endDate: Date;
+}
+
+/**
+ * تاریخ‌های قفل‌شده (رزرو‌شده) یک کابین را برمی‌گرداند.
+ * برای نمایش روی تقویم و جلوگیری از انتخاب بازه‌ی تکراری استفاده می‌شود.
+ */
+export async function getBookedDates(
+  cabinId: number,
+  query: BookedDatesQuery,
+): Promise<BookedRangeResult[]> {
+  const cabin = await cabinRepository.findCabinById(cabinId);
+  if (!cabin) {
+    throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
+  }
+
+  const ranges = await bookingRepository.findBookedDateRanges(cabinId, {
+    from: query.from,
+    to: query.to,
+  });
+
+  return ranges.map((range) => ({
+    startDate: range.startDate,
+    endDate: range.endDate,
+  }));
 }

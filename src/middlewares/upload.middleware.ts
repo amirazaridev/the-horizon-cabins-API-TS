@@ -21,7 +21,7 @@ const upload = multer({
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       return cb(
         new AppError(
-          "فقط فایل‌های تصویری (JPEG/PNG/WebP/AVIF) مجاز هستند.",
+          "Only image files (JPEG/PNG/WebP/AVIF) are allowed.",
           HTTP_STATUS.BAD_REQUEST,
           ErrorCode.VALIDATION_ERROR,
         ),

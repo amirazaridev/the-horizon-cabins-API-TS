@@ -5,7 +5,8 @@ export function calculateNumNights(startDate: Date, endDate: Date): number {
 }
 
 export function calculateCabinPrice(regularPrice: number, discount: number): number {
-  return Math.floor(regularPrice - (regularPrice * discount) / 100);
+  const finalPrice = regularPrice - (regularPrice * discount) / 100;
+  return Math.max(0, Math.floor(finalPrice));
 }
 
 export function calculateTotalPrice(cabinPrice: number, numNights: number): bigint {
