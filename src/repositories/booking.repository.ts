@@ -75,6 +75,38 @@ export async function countPendingBookingsForGuest(
   });
 }
 
+export interface BookedRange {
+  startDate: Date;
+  endDate: Date;
+}
+
+/**
+ * بازه‌های تاریخِ قفل‌شده‌ی یک کابین را برمی‌گرداند.
+ * فقط رزروهای فعال (pending/confirmed/checkedIn) به‌عنوان تاریخ‌های رزرو‌شده در نظر گرفته می‌شوند.
+ */
+export async function findBookedDateRanges(
+  cabinId: number,
+  options: { from?: Date; to?: Date } = {},
+  db: Db = prisma,
+): Promise<BookedRange[]> {
+  return db.booking.findMany({
+    where: {
+      cabinId,
+      status: { in: ACTIVE_BOOKING_STATUSES },
+      ...(options.from || options.to
+        ? {
+            endDate: {
+              ...(options.from ? { gte: options.from } : {}),
+              ...(options.to ? { lte: options.to } : {}),
+            },
+          }
+        : {}),
+    },
+    select: { startDate: true, endDate: true },
+    orderBy: { startDate: "asc" },
+  });
+}
+
 export async function createBooking(
   data: Prisma.BookingCreateInput,
   db: Db = prisma,
@@ -82,8 +114,12 @@ export async function createBooking(
   return db.booking.create({ data });
 }
 
-export async function updateBooking(id: number, data: Prisma.BookingUpdateInput): Promise<Booking> {
-  return prisma.booking.update({ where: { id }, data });
+export async function updateBooking(
+  id: number,
+  data: Prisma.BookingUpdateInput,
+  db: Db = prisma,
+): Promise<Booking> {
+  return db.booking.update({ where: { id }, data });
 }
 
 export async function expirePendingBookings(now: Date): Promise<number> {

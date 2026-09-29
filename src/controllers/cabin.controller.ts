@@ -8,7 +8,6 @@ export async function getAll(req: Request, res: Response): Promise<void> {
   const { parseQuery } = req;
   const { category: categorySlug } = parseQuery as unknown as { category?: string };
   const filters = parseQuery as unknown as CabinFilters;
-  console.log(filters);
   const { data: cabins, meta } = await cabinService.getAllCabins({
     skip,
     limit,
