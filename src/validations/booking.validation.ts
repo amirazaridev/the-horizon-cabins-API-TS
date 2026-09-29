@@ -30,9 +30,20 @@ const updateStatusBodySchema = z.object({
   status: z.enum(["checkedIn", "checkedOut"]),
 });
 
+const bookedDatesQuerySchema = z
+  .object({
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+  })
+  .refine((range) => !range.from || !range.to || range.from <= range.to, {
+    message: "from must be before or equal to to",
+    path: ["from"],
+  });
+
 export const createBookingSchema = { body: createBookingBodySchema };
 export const listBookingsQueryValidation = { query: listBookingWithPagQuerySchema };
 export const getBookingSchema = { params: idParamsSchema };
 export const payBookingSchema = { params: idParamsSchema };
 export const cancelBookingSchema = { params: idParamsSchema };
 export const updateBookingStatusSchema = { params: idParamsSchema, body: updateStatusBodySchema };
+export const bookedDatesSchema = { params: idParamsSchema, query: bookedDatesQuerySchema };

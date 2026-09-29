@@ -9,7 +9,6 @@ export const BOOKING_CONSTANTS = {
   EXPIRATION_CHECK_CRON: "*/1 * * * *",
 } as const;
 
-//* TODO : add confirmed "cancelled"
 export const VALID_STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   pending: ["confirmed", "cancelled"],
   confirmed: ["checkedIn"],
@@ -18,12 +17,9 @@ export const VALID_STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = 
   cancelled: [],
 };
 
-export const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
-  "pending",
-  "confirmed",
-  "checkedIn",
-  "checkedOut",
-];
+//* این وضعیت‌ها یعنی کابین برای بازه‌ی تاریخ رزرو، اشغال/محجوز است.
+//* رزرو "checkedOut" تمام شده و نباید مانع رزرو جدید شود.
+export const ACTIVE_BOOKING_STATUSES: BookingStatus[] = ["pending", "confirmed", "checkedIn"];
 
 export interface BookingSettings {
   paymentDeadlineMinutes: number;

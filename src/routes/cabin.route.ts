@@ -4,7 +4,6 @@ import { validate } from "../middlewares/validate.middleware.js";
 import * as cabinValidation from "../validations/cabin.validation.js";
 import * as categoryValidation from "../validations/category.validation.js";
 import { paginationMiddleware } from "../middlewares/pagination.middleware.js";
-import { paginationQueryValidation } from "../validations/pagination.validation.js";
 
 const router = Router();
 

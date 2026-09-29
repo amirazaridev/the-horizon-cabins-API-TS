@@ -8,7 +8,7 @@ import { extractFilePath, removeUploadedImages, uploadCabinImages } from "../uti
 import { getPaginationMeta } from "../utils/pagination.utils.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
-import { PaginatedResult, PaginationParams } from "../types/pagination.types.js";
+import type { PaginatedResult } from "../types/pagination.types.js";
 import { CabinFilters, CabinWithCity } from "../types/cabin.types.js";
 
 type CreateCabinInput = z.infer<typeof createCabinSchema.body>;
@@ -92,7 +92,7 @@ export async function createCabin(
   input: CreateCabinInput,
   imageFiles: Express.Multer.File[] = [],
 ): Promise<Cabin> {
-  const { cityId, keepExistingImages, ...cabinData } = input;
+  const { cityId, ...cabinData } = input;
 
   const uploadedUrls = await uploadCabinImages(imageFiles);
 
@@ -147,7 +147,7 @@ export async function updateCabin(
     );
   }
 
-  const { cityId, keepExistingImages, ...rest } = input;
+  const { cityId, ...rest } = input;
 
   try {
     const updatedCabin = await cabinRepository.updateCabin(id, {

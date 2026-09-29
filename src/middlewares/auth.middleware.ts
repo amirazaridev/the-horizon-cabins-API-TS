@@ -4,6 +4,7 @@ import { verifyToken } from "../utils/jwt.utils.js";
 import * as authService from "../services/auth.service.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { ErrorCode } from "../constants/errorCodes.js";
+import type { UserRole } from "../generated/prisma/client.js";
 
 export async function protect(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -26,7 +27,7 @@ export async function protect(req: Request, res: Response, next: NextFunction): 
   }
 }
 
-export function restrictTo(...roles: string[]) {
+export function restrictTo(...roles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user || !roles.includes(req.user.role)) {
       return next(

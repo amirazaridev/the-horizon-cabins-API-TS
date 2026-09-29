@@ -9,6 +9,13 @@ const router = Router();
 
 router.use(protect);
 
+//? تقویم تاریخ‌های رزرو‌شده‌ی یک کابین (برای کلاینت‌ها هم قابل دسترسی است)
+router.get(
+  "/cabin/:cabinId/booked-dates",
+  validate(bookingValidation.bookedDatesSchema),
+  bookingController.getBookedDates,
+);
+
 router
   .route("/")
   .get(
@@ -29,7 +36,7 @@ router
 router
   .route("/:id/status")
   .patch(
-    restrictTo("admin"),
+    restrictTo("admin", "owner"),
     validate(bookingValidation.updateBookingStatusSchema),
     bookingController.updateStatus,
   );
