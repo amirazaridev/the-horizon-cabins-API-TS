@@ -1,6 +1,6 @@
 import { prisma } from "../config/database.js";
 import { Prisma } from "../generated/prisma/client.js";
-import type { Cabin, City } from "../generated/prisma/client.js";
+import type { Cabin } from "../generated/prisma/client.js";
 import { CabinFilters, CabinWithCity } from "../types/cabin.types.js";
 
 interface FindAllCabinsParams {
@@ -29,8 +29,14 @@ function buildWhereClause(
       conditions.push({ bedrooms: { gte: filters.bedrooms } });
     }
 
+    // Location filtering.
+    // Priority: an explicit cityId narrows the result to a single city;
+    // regionId is only used as a fallback and resolves through the City
+    // relation, so it matches every cabin in any city of that region.
     if (filters.cityId !== undefined) {
       conditions.push({ cityId: filters.cityId });
+    } else if (filters.regionId !== undefined) {
+      conditions.push({ city: { regionId: filters.regionId } });
     }
 
     if (filters.amenities && filters.amenities.length > 0) {
@@ -121,10 +127,6 @@ export async function setCategoriesForCabin(
     }),
   ]);
 }
-export async function findAllCities(): Promise<City[]> {
-  return prisma.city.findMany();
-}
-
 export async function findAllAmenities(): Promise<string[]> {
   const cabins = await prisma.cabin.findMany({
     select: { amenities: true },

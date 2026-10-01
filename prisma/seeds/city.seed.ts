@@ -5,7 +5,8 @@ export async function seedCities() {
   const upsertPromises = cities.map((city) =>
     prisma.city.upsert({
       where: { name: city.name },
-      update: {},
+      // Re-align the region on every run so pre-existing cities get their region assigned.
+      update: { regionId: city.regionId },
       create: city,
     }),
   );

@@ -16,4 +16,5 @@ export interface CabinFilters {
   amenities?: string[];
   price?: PriceRange;
   cityId?: number;
+  regionId?: number;
 }
