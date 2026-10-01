@@ -204,6 +204,16 @@ const priceRangeSchema = z
 // Cabin Filters
 // -------------------------------------
 
+const optionalPositiveInt = (label: string) =>
+  z.preprocess(
+    safeNumber,
+    z
+      .number({ message: `${label} must be a number` })
+      .int({ message: `${label} must be an integer` })
+      .positive({ message: `${label} must be greater than 0` })
+      .optional(),
+  );
+
 const cabinFiltersSchema = z.object({
   guests: z.preprocess(
     safeNumber,
@@ -251,20 +261,12 @@ const cabinFiltersSchema = z.object({
 
   price: priceRangeSchema.optional(),
 
-  city: z.preprocess(
-    safeNumber,
-    z
-      .number({
-        message: "City must be a number",
-      })
-      .int({
-        message: "City must be an integer",
-      })
-      .positive({
-        message: "City must be greater than 0",
-      })
-      .optional(),
-  ),
+  cityId: optionalPositiveInt("City ID"),
+
+  regionId: optionalPositiveInt("Region ID"),
+
+  // Legacy alias: `?city=` is still accepted and behaves exactly like `?cityId=`.
+  city: optionalPositiveInt("City"),
 });
 
 // -------------------------------------
@@ -277,15 +279,15 @@ const cabinQuerySchema = z
     ...categorySlugQueryValidation.query.shape,
     ...cabinFiltersSchema.shape,
   })
-  .transform(({ city, ...rest }) => ({
-    ...rest,
+  .transform(({ city, cityId, ...rest }) => {
+    // `cityId` is the canonical parameter; `city` is kept as a legacy alias.
+    const resolvedCityId = cityId ?? city;
 
-    ...(city !== undefined
-      ? {
-          cityId: city,
-        }
-      : {}),
-  }));
+    return {
+      ...rest,
+      ...(resolvedCityId !== undefined && { cityId: resolvedCityId }),
+    };
+  });
 
 // -------------------------------------
 // Exported Validations

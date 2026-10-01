@@ -18,10 +18,6 @@ export async function getAll(req: Request, res: Response): Promise<void> {
   });
   sendSuccess(res, { data: { cabins, meta } });
 }
-export async function getAllCity(req: Request, res: Response) {
-  const cities = await cabinService.getAllCities();
-  sendSuccess(res, { data: { cities } });
-}
 
 export async function getAllAmenities(req: Request, res: Response) {
   const amenities = await cabinService.getAllAmenities();

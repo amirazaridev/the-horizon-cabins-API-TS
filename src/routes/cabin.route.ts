@@ -16,7 +16,6 @@ router
     cabinController.getAll,
   )
   .post(cabinController.createCabin);
-router.route("/cities").get(cabinController.getAllCity);
 router.route("/amenities").get(cabinController.getAllAmenities);
 
 router

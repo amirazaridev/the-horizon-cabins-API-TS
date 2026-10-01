@@ -1,7 +1,7 @@
 import { AppError } from "../utils/AppError.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as categoryRepository from "../repositories/category.repository.js";
-import type { Cabin, City, Category } from "../generated/prisma/client.js";
+import type { Cabin, Category } from "../generated/prisma/client.js";
 import type { z } from "zod";
 import type { createCabinSchema, updateCabinSchema } from "../validations/cabin.validation.js";
 import { extractFilePath, removeUploadedImages, uploadCabinImages } from "../utils/upload.utils.js";
@@ -36,10 +36,6 @@ export async function getAllCabins(
     data,
     meta: getPaginationMeta(total, page, limit),
   };
-}
-
-export async function getAllCities(): Promise<City[]> {
-  return await cabinRepository.findAllCities();
 }
 
 export async function getAllAmenities(): Promise<string[]> {

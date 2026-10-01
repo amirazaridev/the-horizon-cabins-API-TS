@@ -82,15 +82,33 @@ model Guest {
   @@map("guests")
 }
 
+model Region {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique @db.VarChar(100)
+  slug         String   @unique @db.VarChar(100)
+  displayOrder Int      @default(0) @map("display_order")
+
+  cities       City[]
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("regions")
+}
+
 model City {
   id        Int      @id @default(autoincrement())
   name      String   @unique @db.VarChar(100)
+
+  regionId  Int      @map("region_id")
+  region    Region   @relation(fields: [regionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   cabins    Cabin[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([regionId])
   @@map("cities")
 }
 
