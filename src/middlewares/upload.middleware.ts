@@ -19,7 +19,13 @@ const upload = multer({
   },
   fileFilter: (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      return cb(new AppError("فقط فایل‌های تصویری (JPEG/PNG/WebP/AVIF) مجاز هستند.", HTTP_STATUS.BAD_REQUEST, ErrorCode.VALIDATION_ERROR));
+      return cb(
+        new AppError(
+          "Only image files (JPEG/PNG/WebP/AVIF) are allowed.",
+          HTTP_STATUS.BAD_REQUEST,
+          ErrorCode.VALIDATION_ERROR,
+        ),
+      );
     }
     cb(null, true);
   },

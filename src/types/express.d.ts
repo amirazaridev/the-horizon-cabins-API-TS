@@ -1,5 +1,5 @@
-import { SafeUser } from "./user.types.ts";
-import { PaginationParams } from "../utils/pagination.js";
+import type { SafeUser } from "./user.types.js";
+import type { PaginationParams } from "./pagination.types.js";
 
 declare global {
   namespace Express {

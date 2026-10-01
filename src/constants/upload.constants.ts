@@ -1,10 +1,10 @@
 /** فرمت‌های تصویر مجاز — تک منبع حقیقت برای middleware و util */
-export const ALLOWED_MIME_TYPES = /** @type {const} */ ([
+export const ALLOWED_MIME_TYPES =  [
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/avif",
-]);
+];
 
 /** حداکثر حجم هر تصویر: ۵ مگابایت */
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;

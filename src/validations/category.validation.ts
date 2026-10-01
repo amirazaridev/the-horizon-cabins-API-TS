@@ -60,7 +60,10 @@ const assignCategoriesBodySchema = z.object({
 
 const cabinCategoryParamsSchema = z.object({
   id: z.string().regex(/^\d+$/, { message: "ID must be a number" }).transform(Number),
-  categoryId: z.string().regex(/^\d+$/, { message: "Category ID must be a number" }).transform(Number),
+  categoryId: z
+    .string()
+    .regex(/^\d+$/, { message: "Category ID must be a number" })
+    .transform(Number),
 });
 
 export const createCategorySchema = {

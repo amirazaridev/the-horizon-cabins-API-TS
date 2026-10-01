@@ -30,7 +30,11 @@ export async function login(
   }
 
   if (user.lockedUntil && user.lockedUntil > new Date()) {
-    throw new AppError("Account is locked. Please try again later.", HTTP_STATUS.FORBIDDEN, ErrorCode.FORBIDDEN);
+    throw new AppError(
+      "Account is locked. Please try again later.",
+      HTTP_STATUS.FORBIDDEN,
+      ErrorCode.FORBIDDEN,
+    );
   }
 
   const { password: pw, ...safeUser } = user;
@@ -79,7 +83,11 @@ export async function verifyUserFromToken(
   }
 
   if (isPasswordChangedAfter(currentUser.lastPasswordChange, tokenIssuedAt)) {
-    throw new AppError("User recently changed password! Please log in again.", HTTP_STATUS.UNAUTHORIZED, ErrorCode.UNAUTHORIZED);
+    throw new AppError(
+      "User recently changed password! Please log in again.",
+      HTTP_STATUS.UNAUTHORIZED,
+      ErrorCode.UNAUTHORIZED,
+    );
   }
 
   return currentUser;

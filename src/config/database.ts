@@ -42,3 +42,8 @@ export const disconnectDatabase = async (): Promise<void> => {
   await prisma.$disconnect();
   logger.info("Database disconnected");
 };
+
+export type PrismaTransactionClient = Omit<
+  typeof prisma,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;

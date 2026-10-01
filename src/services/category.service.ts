@@ -2,7 +2,10 @@ import { AppError } from "../utils/AppError.js";
 import * as categoryRepository from "../repositories/category.repository.js";
 import type { Category } from "../generated/prisma/client.js";
 import type { z } from "zod";
-import type { createCategorySchema, updateCategorySchema } from "../validations/category.validation.js";
+import type {
+  createCategorySchema,
+  updateCategorySchema,
+} from "../validations/category.validation.js";
 import { formatCabinCount } from "../utils/format.util.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
