@@ -19,6 +19,16 @@ const signupBodySchema = z.object({
     .string()
     .min(6, { message: "Password must be at least 6 characters" })
     .max(100, { message: "Password cannot exceed 100 characters" }),
+
+  /**
+   * ⚠️ توکن یک‌بارمصرف تایید ایمیل که از `POST /otp/verify` می‌آید.
+   * بدون آن ثبت‌نام رد می‌شود؛ این تنها راه اثبات این است که کاربر
+   * واقعاً به ایمیل دسترسی دارد.
+   */
+  verificationToken: z
+    .string()
+    .min(1, { message: "Email verification is required" })
+    .trim(),
 });
 // نکته امنیتی: role عمداً اینجا نیست تا کاربر نتونه role خودش رو ست کنه (Mass Assignment)
 

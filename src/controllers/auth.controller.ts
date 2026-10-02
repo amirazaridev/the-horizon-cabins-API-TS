@@ -59,6 +59,7 @@ export function logout(req: Request, res: Response): void {
 
 export async function signup(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    // بدنه شامل `verificationToken` است که در validation الزامی شده.
     const { user, token } = await authService.signup(req.body);
     sendTokenCookie(res, token);
     sendSuccess(res, {

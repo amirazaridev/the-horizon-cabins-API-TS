@@ -32,6 +32,26 @@ const envSchema = z.object({
     .string()
     .min(1, { message: "SUPABASE_SERVICE_ROLE_KEY is required" }),
   SUPABASE_BUCKET_CABINS: z.string().default("cabins"),
+
+  // 🆕 Email / OTP (Resend)
+  RESEND_API_KEY: z.string().min(1, { message: "RESEND_API_KEY is required" }),
+  /// فرستنده‌ی ایمیل. طبق مستندات Resend در production باید دامنه‌ی
+  /// تاییدشده باشد؛ در development مقدار تست `onboarding@resend.dev` کافی است.
+  MAIL_FROM: z.string().default("Horizon <onboarding@resend.dev>"),
+  /// طول کد تایید (تعداد ارقام) — NIST حداقل ۶ رقم را الزام می‌کند.
+  OTP_LENGTH: z.coerce.number().int().min(6).max(10).default(6),
+  /// مدت اعتبار کد (ثانیه). پیش‌فرض ۲ دقیقه — هم‌راستا با فرانت.
+  OTP_TTL_SECONDS: z.coerce.number().int().positive().default(120),
+  /// سقف تلاش اشتباه روی یک کد پیش از باطل‌شدن.
+  OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  /// فاصله‌ی حداقلی بین دو ارسال به یک ایمیل (ثانیه).
+  OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(60),
+  /// سقف تعداد ارسال در بازه‌ی محدودیت نرخ.
+  OTP_MAX_SENDS_PER_WINDOW: z.coerce.number().int().positive().default(5),
+  /// طول بازه‌ی محدودیت نرخ ارسال (ساعت).
+  OTP_RATE_LIMIT_WINDOW_HOURS: z.coerce.number().int().positive().default(1),
+  /// مدت اعتبار توکن یک‌بارمصرف تایید ایمیل (ثانیه) — کوتاه، فقط برای ثبت‌نام.
+  OTP_VERIFICATION_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(600),
 });
 
 const env = envSchema.parse(process.env);
