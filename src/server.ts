@@ -2,6 +2,7 @@ import createApp from "./app.js";
 import { checkDatabaseConnection, disconnectDatabase } from "./config/database.js";
 import env from "./config/env.js";
 import logger from "./config/logger.js";
+import { startOtpCleanupJob } from "./jobs/otp-cleanup.job.js";
 /* eslint-disable n/no-process-exit */
 async function startServer(): Promise<void> {
   const app = createApp();
@@ -10,6 +11,9 @@ async function startServer(): Promise<void> {
     logger.error("Failed to connect to database. Server not started.");
     process.exit(1);
   }
+
+  // جاب‌های دوره‌ای — بعد از اطمینان از اتصال دیتابیس.
+  startOtpCleanupJob();
 
   const server = app.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} [${env.NODE_ENV}]`);
