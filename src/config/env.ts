@@ -33,11 +33,22 @@ const envSchema = z.object({
     .min(1, { message: "SUPABASE_SERVICE_ROLE_KEY is required" }),
   SUPABASE_BUCKET_CABINS: z.string().default("cabins"),
 
-  // 🆕 Email / OTP (Resend)
-  RESEND_API_KEY: z.string().min(1, { message: "RESEND_API_KEY is required" }),
-  /// فرستنده‌ی ایمیل. طبق مستندات Resend در production باید دامنه‌ی
-  /// تاییدشده باشد؛ در development مقدار تست `onboarding@resend.dev` کافی است.
-  MAIL_FROM: z.string().default("Horizon <onboarding@resend.dev>"),
+  // 🆕 Email / OTP (SMTP عبر Gmail)
+  /// میزبان SMTP گوگل.
+  SMTP_HOST: z.string().default("smtp.gmail.com"),
+  /// پورت SMTP — ۴۶۵ برای اتصال امن (SSL/TLS).
+  SMTP_PORT: z.coerce.number().int().positive().default(465),
+  /// `true` برای اتصال امن از ابتدا (پورت ۴۶۵). با STARTTLS روی ۵۸۷ false بگذارید.
+  SMTP_SECURE: z
+    .string()
+    .optional()
+    .transform((value) => value !== "false"),
+  /// نام کاربری SMTP — آدرس کامل جیمیل (مثلاً you@gmail.com).
+  SMTP_USER: z.string().default(""),
+  /// رمز عبور برنامه‌ی جیمیل (App Password) — نه رمز اصلی حساب.
+  SMTP_PASS: z.string().default(""),
+  /// فرستنده‌ی ایمیل — نام نمایشی + آدرس. در جیمیل باید همان SMTP_USER باشد.
+  SMTP_FROM: z.string().default("Horizon <no-reply@example.com>"),
   /// طول کد تایید (تعداد ارقام) — NIST حداقل ۶ رقم را الزام می‌کند.
   OTP_LENGTH: z.coerce.number().int().min(6).max(10).default(6),
   /// مدت اعتبار کد (ثانیه). پیش‌فرض ۲ دقیقه — هم‌راستا با فرانت.

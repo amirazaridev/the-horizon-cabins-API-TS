@@ -19,10 +19,10 @@ import { OtpPurpose } from "../generated/prisma/enums.js";
  * سرویس کد تایید (OTP).
  *
  * این لایه همه‌ی تصمیم‌های دامنه را می‌گیرد و به هیچ صراط مستقیم با
- * Prisma یا Resend حرف نمی‌زند؛ از ریپازیتوری و mail.service استفاده
+ * Prisma یا SMTP حرف نمی‌زند؛ از ریپازیتوری و mail.service استفاده
  * می‌کند. کنترلر فقط ورودی/خروجی HTTP را می‌شناسد.
  *
- * ⚠️ اصول امنیتی رعایت‌شده (طبق NIST 800-63B و مستندات Resend):
+ * ⚠️ اصول امنیتی رعایت‌شده (طبق NIST 800-63B):
  *  1. کد با CSPRNG تولید می‌شود (`crypto.randomInt`)، نه `Math.random`.
  *  2. کد فقط به‌صورت هش bcrypt ذخیره می‌شود.
  *  3. عمر کوتاه (پیش‌فرض ۲ دقیقه) و یک‌بارمصرف.
@@ -119,9 +119,6 @@ export async function requestOtp(
       subject,
       html,
       text,
-      // کلید idempotency یکتا به‌ازای هر ردیف — جلوگیری از ارسال تکراری
-      // با retry شبکه‌ای، ولی اجازه‌ی ارسال کدهای متفاوت در ردیف‌های بعدی.
-      idempotencyKey: `otp-${purposeType}-${record.id}`,
     });
   } catch (error) {
     // اگر ایمیل نرفت، کد نباید «در انتظار» بماند؛ وگرنه کاربر بی‌کد گیر
