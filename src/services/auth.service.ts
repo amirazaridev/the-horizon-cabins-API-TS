@@ -52,7 +52,7 @@ export async function login(
 
   await userService.resetLoginAttempts(user.id);
 
-  const token = signToken(user.id);
+  const token = signToken(user.id, user.role);
 
   return { user: safeUser, token };
 }
@@ -64,7 +64,7 @@ export async function signup(input: SignupInput): Promise<{ user: SafeUser; toke
 
   await guestRepository.createGuest({ fullName, userId: user.id });
 
-  const token = signToken(user.id);
+  const token = signToken(user.id, user.role);
   return { user, token };
 }
 
@@ -79,6 +79,14 @@ export async function verifyUserFromToken(
       "The user belonging to this token does no longer exist. Please log in again",
       HTTP_STATUS.UNAUTHORIZED,
       ErrorCode.UNAUTHORIZED,
+    );
+  }
+
+  if (!currentUser.active) {
+    throw new AppError(
+      "Your account has been deactivated. Please contact support.",
+      HTTP_STATUS.FORBIDDEN,
+      ErrorCode.FORBIDDEN,
     );
   }
 
