@@ -50,6 +50,25 @@ enum CancellationReason {
   @@map("cancellation_reason")
 }
 
+/// هدفی که یک کد تایید برای آن صادر شده است.
+/// افزودن مقدار جدید بدون تغییر اسکیمای جدول ممکن است (فقط enum).
+enum OtpPurpose {
+  signup          // تایید ایمیل هنگام ساخت حساب
+  passwordReset   // بازیابی رمز عبور
+  login           // ورود دو مرحله‌ای
+
+  @@map("otp_purpose")
+}
+
+enum OtpStatus {
+  pending   // صادر شده، منتظر مصرف
+  consumed  // با موفقیت استفاده شده (یک‌بارمصرف)
+  expired   // منقضی شده
+  revoked   // باطل شده (مثلاً با درخواست کد جدید یا تلاش بیش از حد)
+
+  @@map("otp_status")
+}
+
 // ================================
 // MODELS
 // ================================
@@ -222,4 +241,52 @@ model Setting {
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+/// کد تایید یک‌بارمصرف (OTP).
+///
+/// ⚠️ اصول امنیتی که این مدل رعایت می‌کند:
+///  - کد هرگز به‌صورت متن خام ذخیره نمی‌شود؛ فقط `codeHash` (bcrypt) نگه داشته
+///    می‌شود تا اگر پایگاه‌داده لو رفت، کدها قابل استفاده نباشند.
+///  - کد **یک‌بارمصرف** است؛ بعد از تایید موفق `status = consumed` می‌شود.
+///  - `expiresAt` منبع حقیقت انقضاست (پلاس TTL قابل تنظیم، نه هاردکد).
+///  - `attempts` سقف تلاش اشتباه را می‌شمارد تا حدس زدن کد (brute-force) متوقف شود.
+///  - برای محدودیت نرخ ارسال، از ردیف‌های همین جدول بر اساس `email + createdAt`
+///    شمارش می‌گیریم؛ نیازی به جدول جداگانه نیست.
+///  - `verificationTokenHash`: پس از تایید موفق، یک توکن یک‌بارمصرف کوتاه‌عمر
+///    صادر می‌شود که در `signup` الزامی است. تنها هش آن ذخیره می‌شود.
+model VerificationCode {
+  id                  Int         @id @default(autoincrement())
+
+  /// ایمیل مقصد (نرمال‌شده: lowercase/trim).
+  email               String      @db.VarChar(254)
+  purpose             OtpPurpose
+
+  /// هش bcrypt کد ۶ رقمی — کد خام هرگز ذخیره نمی‌شود.
+  codeHash            String      @map("code_hash") @db.VarChar(255)
+
+  status              OtpStatus   @default(pending)
+
+  /// تعداد تلاش‌های اشتباه تا این لحظه.
+  attempts            Int         @default(0)
+  /// سقف تلاش مجاز — در زمان صدور snapshot می‌شود تا تغییر تنظیمات
+  /// بعداً اعتبار ردیف‌های در جریان را عوض نکند.
+  maxAttempts         Int         @map("max_attempts")
+
+  expiresAt           DateTime    @map("expires_at")
+  consumedAt          DateTime?   @map("consumed_at")
+
+  /// هش توکن یک‌بارمصرف تایید ایمیل (فقط بعد از verify موفق پر می‌شود).
+  verificationTokenHash String?   @unique @map("verification_token_hash") @db.VarChar(255)
+  /// انقضای توکن تایید — کوتاه‌تر از عمر نشست، فقط برای تکمیل ثبت‌نام.
+  verificationExpiresAt DateTime? @map("verification_expires_at")
+
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  /// برای «آخرین کد فعال این ایمیل» و کوئری‌های محدودیت نرخ.
+  @@index([email, purpose, status])
+  /// برای پاک‌سازی دوره‌ای ردیف‌های منقضی.
+  @@index([expiresAt])
+  @@map("verification_codes")
 }

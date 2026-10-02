@@ -4,6 +4,7 @@ import { comparePassword, isPasswordChangedAfter } from "../utils/password.utils
 import * as userRepository from "../repositories/user.repository.js";
 import * as guestRepository from "../repositories/guest.repository.js";
 import * as userService from "./user.service.js";
+import * as otpService from "./otp.service.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { SafeUser } from "../types/user.types.js";
@@ -57,12 +58,47 @@ export async function login(
   return { user: safeUser, token };
 }
 
+/**
+ * ساخت حساب کاربر جدید.
+ *
+ * ⚠️ پیش‌شرط امنیتی: ایمیل باید قبلاً در `POST /otp/verify` تایید شده
+ * باشد و `verificationToken` معتبر همراه بیاید. این توکن **یک‌بارمصرف**
+ * است و بلافاصله پس از ساخت حساب سوخته می‌شود.
+ *
+ * ترتیب عملیات عمدی است:
+ *  ۱. اعتبارسنجی توکن تایید (بدون مصرف‌کردن آن).
+ *  ۲. بررسی نبودن ایمیل تکراری (با پاسخ 409 واضح).
+ *  ۳. ساخت کاربر و مهمان.
+ *  ۴. سوختن توکن — بعد از موفقیت، تا اگر خطایی در میانه رخ داد،
+ *     کاربر مجبور نشود دوباره کد بگیرد.
+ */
 export async function signup(input: SignupInput): Promise<{ user: SafeUser; token: string }> {
-  const { fullName, ...userData } = input;
+  const { fullName, verificationToken, ...userData } = input;
 
+  // ۱) توکن تایید ایمیل باید معتبر باشد.
+  const { recordId } = await otpService.consumeVerificationToken(
+    userData.email,
+    "signup",
+    verificationToken,
+  );
+
+  // ۲) جلوگیری از ایمیل تکراری با پیام روشن (به‌جای خطای مبهم یکتایی).
+  const existing = await userRepository.findUserByEmail(userData.email);
+  if (existing) {
+    throw new AppError(
+      "This email is already registered. Please log in instead.",
+      HTTP_STATUS.CONFLICT,
+      ErrorCode.DUPLICATE_EMAIL,
+    );
+  }
+
+  // ۳) ساخت کاربر و پروفایل مهمان.
   const user = await userRepository.createUser(userData);
 
   await guestRepository.createGuest({ fullName, userId: user.id });
+
+  // ۴) سوختن توکن یک‌بارمصرف.
+  await otpService.invalidateVerificationToken(recordId);
 
   const token = signToken(user.id, user.role);
   return { user, token };
