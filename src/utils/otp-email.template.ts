@@ -26,7 +26,12 @@ export type EmailContent = {
   text: string;
 };
 
-export function buildOtpEmail({ code, purpose, ttlMinutes, appName }: BuildOtpEmailInput): EmailContent {
+export function buildOtpEmail({
+  code,
+  purpose,
+  ttlMinutes,
+  appName,
+}: BuildOtpEmailInput): EmailContent {
   const label = OTP_PURPOSE_LABELS[purpose];
   const subject = `${appName} — کد ${label}: ${code}`;
 

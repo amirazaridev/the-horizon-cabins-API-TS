@@ -264,9 +264,7 @@ describe("booking.service", () => {
     });
 
     it("should cancel a pending booking successfully", async () => {
-      vi.mocked(bookingRepository.findBookingById).mockResolvedValue(
-        mockBooking({}) as never,
-      );
+      vi.mocked(bookingRepository.findBookingById).mockResolvedValue(mockBooking({}) as never);
       vi.mocked(bookingRepository.updateBooking).mockResolvedValue({
         status: "cancelled",
         cancellationReason: "userCancelled",
