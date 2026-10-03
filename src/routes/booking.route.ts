@@ -4,6 +4,7 @@ import { protect, restrictTo } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import * as bookingValidation from "../validations/booking.validation.js";
 import { paginationMiddleware } from "../middlewares/pagination.middleware.js";
+import { BOOKING_ADMIN_ROLES } from "../constants/booking.constants.js";
 
 const router = Router();
 
@@ -36,7 +37,7 @@ router
 router
   .route("/:id/status")
   .patch(
-    restrictTo("admin", "owner"),
+    restrictTo(...BOOKING_ADMIN_ROLES),
     validate(bookingValidation.updateBookingStatusSchema),
     bookingController.updateStatus,
   );

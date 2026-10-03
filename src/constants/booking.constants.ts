@@ -1,4 +1,6 @@
-import { BookingStatus } from "../generated/prisma/enums.js";
+import { BookingStatus, UserRole } from "../generated/prisma/enums.js";
+
+export const BOOKING_ADMIN_ROLES: readonly UserRole[] = ["admin", "owner"];
 
 export const BOOKING_CONSTANTS = {
   PAYMENT_DEADLINE_MINUTES: 30,
@@ -10,18 +12,18 @@ export const BOOKING_CONSTANTS = {
 } as const;
 
 export const VALID_STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  pending: ["confirmed", "cancelled"],
-  confirmed: ["checkedIn"],
+  pending: ["cancelled"],
+  confirmed: ["checkedIn", "cancelled"],
   checkedIn: ["checkedOut"],
   checkedOut: [],
   cancelled: [],
 };
 
-//* این وضعیت‌ها یعنی کابین برای بازه‌ی تاریخ رزرو، اشغال/محجوز است.
-//* رزرو "checkedOut" تمام شده و نباید مانع رزرو جدید شود.
-export const ACTIVE_BOOKING_STATUSES: BookingStatus[] = ["pending", "confirmed", "checkedIn"];
 
-export interface BookingSettings {
+//* وضعیت‌هایی که یک بازه را «اشغال‌شده» نشان می‌دهند
+export const OCCUPYING_STATUSES: BookingStatus[] = ["confirmed", "checkedIn"];
+
+interface BookingSettings {
   paymentDeadlineMinutes: number;
   maxPendingBookingsPerGuest: number;
   minBookingLengthNights: number;

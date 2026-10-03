@@ -4,7 +4,7 @@ import * as bookingService from "./booking.service.js";
 import * as bookingRepository from "../repositories/booking.repository.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as guestRepository from "../repositories/guest.repository.js";
-import { isValidStatusTransition } from "../utils/booking-status.util.js";
+import { isValidStatusTransition } from "../utils/booking.util.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 
