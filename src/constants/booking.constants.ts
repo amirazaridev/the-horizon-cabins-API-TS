@@ -1,5 +1,7 @@
 import { BookingStatus, UserRole } from "../generated/prisma/enums.js";
 
+export const TIMEZONE = "Asia/Tehran" as const;
+
 export const BOOKING_ADMIN_ROLES: readonly UserRole[] = ["admin", "owner"];
 
 export const BOOKING_CONSTANTS = {
@@ -18,7 +20,6 @@ export const VALID_STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = 
   checkedOut: [],
   cancelled: [],
 };
-
 
 //* وضعیت‌هایی که یک بازه را «اشغال‌شده» نشان می‌دهند
 export const OCCUPYING_STATUSES: BookingStatus[] = ["confirmed", "checkedIn"];

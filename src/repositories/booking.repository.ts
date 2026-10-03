@@ -165,14 +165,18 @@ export async function transitionBookingStatus(
   return count === 1;
 }
 
-export async function expirePendingBookings(now: Date): Promise<number> {
-  const result = await prisma.booking.updateMany({
-    where: { status: "pending", paymentDeadline: { lt: now } },
-    data: {
-      status: "cancelled",
-      cancelledAt: now,
-      cancellationReason: "paymentExpired" as CancellationReason,
+export async function expirePendingBookings(
+  now: Date,
+  options: { cabinId?: number } = {},
+  db: Db = prisma,
+): Promise<number> {
+  const result = await db.booking.updateMany({
+    where: {
+      status: "pending",
+      paymentDeadline: { lte: now },
+      ...(options.cabinId !== undefined && { cabinId: options.cabinId }),
     },
+    data: { status: "cancelled", cancelledAt: now, cancellationReason: "paymentExpired" },
   });
   return result.count;
 }
