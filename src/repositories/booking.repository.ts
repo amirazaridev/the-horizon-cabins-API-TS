@@ -1,7 +1,7 @@
 import { prisma, PrismaTransactionClient } from "../config/database.js";
 import { ACTIVE_BOOKING_STATUSES } from "../constants/booking.constants.js";
 import { Prisma } from "../generated/prisma/client.js";
-import type { Booking, CancellationReason } from "../generated/prisma/client.js";
+import type { Booking, BookingStatus, CancellationReason } from "../generated/prisma/client.js";
 import { BookingFilters, FindAllBookingsParams } from "../types/booking.types.js";
 
 type Db = typeof prisma | PrismaTransactionClient;
@@ -114,6 +114,46 @@ export async function updateBooking(
   db: Db = prisma,
 ): Promise<Booking> {
   return db.booking.update({ where: { id }, data });
+}
+/** فقط اگر هنوز pending و مهلت پرداخت نگذشته باشد، تایید می‌کند. */
+export async function confirmPendingBooking(
+  id: number,
+  data: { paidAt: Date; paymentReference: string },
+  db: Db = prisma,
+): Promise<boolean> {
+  const { count } = await db.booking.updateMany({
+    where: { id, status: "pending", paymentDeadline: { gt: data.paidAt } },
+    data: { status: "confirmed", paidAt: data.paidAt, paymentReference: data.paymentReference },
+  });
+  return count === 1;
+}
+
+/** فقط اگر هنوز pending باشد، لغو می‌کند. */
+export async function cancelPendingBooking(
+  id: number,
+  cancelledAt: Date,
+  reason: CancellationReason,
+  db: Db = prisma,
+): Promise<boolean> {
+  const { count } = await db.booking.updateMany({
+    where: { id, status: "pending" },
+    data: { status: "cancelled", cancelledAt, cancellationReason: reason },
+  });
+  return count === 1;
+}
+
+/** فقط اگر status هنوز همان مقداری باشد که اعتبارسنجی روی آن انجام شده، تغییر می‌دهد. */
+export async function transitionBookingStatus(
+  id: number,
+  from: BookingStatus,
+  data: Prisma.BookingUpdateManyMutationInput,
+  db: Db = prisma,
+): Promise<boolean> {
+  const { count } = await db.booking.updateMany({
+    where: { id, status: from },
+    data,
+  });
+  return count === 1;
 }
 
 export async function expirePendingBookings(now: Date): Promise<number> {

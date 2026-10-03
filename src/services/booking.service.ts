@@ -46,6 +46,14 @@ function assertBookingOwnership(booking: Booking & { guest: { userId: number } }
   }
 }
 
+async function getBookingOrThrow(id: number) {
+  const booking = await bookingRepository.findBookingById(id);
+  if (!booking) {
+    throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
+  }
+  return booking;
+}
+
 export async function createBooking(input: CreateBookingInput, userId: number): Promise<Booking> {
   const guest = await guestRepository.findGuestByUserId(userId);
   if (!guest) {
@@ -166,10 +174,7 @@ export async function getAllBookings(
 }
 
 export async function getBookingById(id: number, userId: number, role: UserRole): Promise<Booking> {
-  const booking = await bookingRepository.findBookingById(id);
-  if (!booking) {
-    throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
-  }
+  const booking = await getBookingOrThrow(id);
 
   if (!hasFullBookingAccess(role)) {
     assertBookingOwnership(booking, userId);
@@ -179,11 +184,7 @@ export async function getBookingById(id: number, userId: number, role: UserRole)
 }
 
 export async function payBooking(id: number, userId: number): Promise<Booking> {
-  const booking = await bookingRepository.findBookingById(id);
-  if (!booking) {
-    throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
-  }
-
+  const booking = await getBookingOrThrow(id);
   assertBookingOwnership(booking, userId);
 
   if (booking.status !== "pending") {
@@ -202,21 +203,24 @@ export async function payBooking(id: number, userId: number): Promise<Booking> {
     );
   }
 
-  const paymentReference = simulatePaymentGateway();
-
-  return bookingRepository.updateBooking(id, {
-    status: "confirmed",
+  const confirmed = await bookingRepository.confirmPendingBooking(id, {
     paidAt: new Date(),
-    paymentReference,
+    paymentReference: simulatePaymentGateway(),
   });
+
+  if (!confirmed) {
+    throw new AppError(
+      "This booking is no longer payable",
+      HTTP_STATUS.CONFLICT,
+      ErrorCode.BOOKING_ALREADY_PROCESSED,
+    );
+  }
+
+  return getBookingOrThrow(id);
 }
 
 export async function cancelBooking(id: number, userId: number): Promise<Booking> {
-  const booking = await bookingRepository.findBookingById(id);
-  if (!booking) {
-    throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
-  }
-
+  const booking = await getBookingOrThrow(id);
   assertBookingOwnership(booking, userId);
 
   if (booking.status !== "pending") {
@@ -226,19 +230,21 @@ export async function cancelBooking(id: number, userId: number): Promise<Booking
       ErrorCode.BOOKING_CANNOT_CANCEL,
     );
   }
+  const cancelled = await bookingRepository.cancelPendingBooking(id, new Date(), "userCancelled");
 
-  return bookingRepository.updateBooking(id, {
-    status: "cancelled",
-    cancelledAt: new Date(),
-    cancellationReason: "userCancelled",
-  });
+  if (!cancelled) {
+    throw new AppError(
+      "Only pending bookings can be cancelled",
+      HTTP_STATUS.CONFLICT,
+      ErrorCode.BOOKING_CANNOT_CANCEL,
+    );
+  }
+
+  return getBookingOrThrow(id);
 }
 
 export async function updateBookingStatus(id: number, input: UpdateStatusInput): Promise<Booking> {
-  const booking = await bookingRepository.findBookingById(id);
-  if (!booking) {
-    throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
-  }
+  const booking = await getBookingOrThrow(id);
 
   if (!isValidStatusTransition(booking.status, input.status)) {
     throw new AppError(
@@ -247,8 +253,19 @@ export async function updateBookingStatus(id: number, input: UpdateStatusInput):
       ErrorCode.BOOKING_INVALID_STATUS_TRANSITION,
     );
   }
+  const updated = await bookingRepository.transitionBookingStatus(id, booking.status, {
+    status: input.status,
+  });
 
-  return bookingRepository.updateBooking(id, { status: input.status });
+  if (!updated) {
+    throw new AppError(
+      "Booking status was changed by another request, please retry",
+      HTTP_STATUS.CONFLICT,
+      ErrorCode.BOOKING_INVALID_STATUS_TRANSITION,
+    );
+  }
+
+  return getBookingOrThrow(id);
 }
 
 export async function expirePendingBookings(): Promise<number> {

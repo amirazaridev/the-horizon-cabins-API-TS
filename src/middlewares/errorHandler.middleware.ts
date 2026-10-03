@@ -36,6 +36,11 @@ const prismaErrorMap: Record<
     code: ErrorCode.RELATION_VIOLATION,
     message: "This change conflicts with an existing relation",
   },
+  P2034: {
+    statusCode: HTTP_STATUS.CONFLICT,
+    code: ErrorCode.TRANSACTION_CONFLICT,
+    message: "Please try again",
+  },
 };
 
 export const errorHandler = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
