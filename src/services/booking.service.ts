@@ -6,7 +6,8 @@ import { AppError } from "../utils/AppError.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { getBookingSettings } from "../constants/booking.constants.js";
-import { isValidStatusTransition } from "../utils/booking-status.util.js";
+import { isValidStatusTransition, hasFullBookingAccess } from "../utils/booking.util.js";
+import { simulatePaymentGateway } from "../utils/payment.util.js";
 import {
   calculateCabinPrice,
   calculateNumNights,
@@ -27,14 +28,6 @@ import type { BookedDatesQuery, BookingFilters } from "../types/booking.types.js
 
 type CreateBookingInput = z.infer<typeof createBookingSchema.body>;
 type UpdateStatusInput = z.infer<typeof updateBookingStatusSchema.body>;
-
-export function hasFullBookingAccess(role: UserRole): boolean {
-  return role === "admin" || role === "owner";
-}
-
-function simulatePaymentGateway(): string {
-  return randomUUID();
-}
 
 function assertBookingOwnership(booking: Booking & { guest: { userId: number } }, userId: number) {
   if (booking.guest.userId !== userId) {
@@ -190,7 +183,7 @@ export async function payBooking(id: number, userId: number): Promise<Booking> {
   if (booking.status !== "pending") {
     throw new AppError(
       "This booking has already been processed",
-      HTTP_STATUS.BAD_REQUEST,
+      HTTP_STATUS.CONFLICT,
       ErrorCode.BOOKING_ALREADY_PROCESSED,
     );
   }
@@ -198,7 +191,7 @@ export async function payBooking(id: number, userId: number): Promise<Booking> {
   if (booking.paymentDeadline && isPast(booking.paymentDeadline)) {
     throw new AppError(
       "The payment deadline for this booking has passed",
-      HTTP_STATUS.BAD_REQUEST,
+      HTTP_STATUS.CONFLICT,
       ErrorCode.BOOKING_EXPIRED,
     );
   }
@@ -226,7 +219,7 @@ export async function cancelBooking(id: number, userId: number): Promise<Booking
   if (booking.status !== "pending") {
     throw new AppError(
       "Only pending bookings can be cancelled",
-      HTTP_STATUS.BAD_REQUEST,
+      HTTP_STATUS.CONFLICT,
       ErrorCode.BOOKING_CANNOT_CANCEL,
     );
   }
@@ -253,9 +246,13 @@ export async function updateBookingStatus(id: number, input: UpdateStatusInput):
       ErrorCode.BOOKING_INVALID_STATUS_TRANSITION,
     );
   }
-  const updated = await bookingRepository.transitionBookingStatus(id, booking.status, {
-    status: input.status,
-  });
+
+  const data: Prisma.BookingUpdateManyMutationInput =
+    input.status === "cancelled"
+      ? { status: input.status, cancelledAt: new Date(), cancellationReason: "adminCancelled" }
+      : { status: input.status };
+
+  const updated = await bookingRepository.transitionBookingStatus(id, booking.status, data);
 
   if (!updated) {
     throw new AppError(
@@ -272,15 +269,11 @@ export async function expirePendingBookings(): Promise<number> {
   return bookingRepository.expirePendingBookings(new Date());
 }
 
-export interface BookedRangeResult {
+interface BookedRangeResult {
   startDate: Date;
   endDate: Date;
 }
 
-/**
- * تاریخ‌های قفل‌شده (رزرو‌شده) یک کابین را برمی‌گرداند.
- * برای نمایش روی تقویم و جلوگیری از انتخاب بازه‌ی تکراری استفاده می‌شود.
- */
 export async function getBookedDates(
   cabinId: number,
   query: BookedDatesQuery,

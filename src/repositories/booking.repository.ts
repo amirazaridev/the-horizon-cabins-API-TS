@@ -1,5 +1,5 @@
 import { prisma, PrismaTransactionClient } from "../config/database.js";
-import { ACTIVE_BOOKING_STATUSES } from "../constants/booking.constants.js";
+import { OCCUPYING_STATUSES } from "../constants/booking.constants.js";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Booking, BookingStatus, CancellationReason } from "../generated/prisma/client.js";
 import { BookingFilters, FindAllBookingsParams } from "../types/booking.types.js";
@@ -20,6 +20,15 @@ function buildWhereClause(filters: BookingFilters): Prisma.BookingWhereInput {
   }
 
   return where;
+}
+
+function activeBookingFilter(now: Date): Prisma.BookingWhereInput {
+  return {
+    OR: [
+      { status: { in: OCCUPYING_STATUSES } },
+      { status: "pending", paymentDeadline: { gt: now } },
+    ],
+  };
 }
 
 export async function findAllBookings({ skip, limit, filters }: FindAllBookingsParams) {
@@ -59,7 +68,7 @@ export async function findOverlappingBooking(
   return db.booking.findFirst({
     where: {
       cabinId,
-      status: { in: ACTIVE_BOOKING_STATUSES },
+      ...activeBookingFilter(new Date()),
       startDate: { lt: endDate },
       endDate: { gt: startDate },
     },
@@ -71,7 +80,7 @@ export async function countPendingBookingsForGuest(
   db: Db = prisma,
 ): Promise<number> {
   return db.booking.count({
-    where: { guestId, status: "pending" },
+    where: { guestId, status: "pending", paymentDeadline: { gt: new Date() } },
   });
 }
 
@@ -92,7 +101,7 @@ export async function findBookedDateRanges(
   return db.booking.findMany({
     where: {
       cabinId,
-      status: { in: ACTIVE_BOOKING_STATUSES },
+      ...activeBookingFilter(new Date()),
       ...(options.to && { startDate: { lt: options.to } }),
       ...(options.from && { endDate: { gt: options.from } }),
     },

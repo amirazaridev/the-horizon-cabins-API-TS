@@ -3,7 +3,7 @@ import { safeNumber } from "../utils/safeParseNumber.js";
 import { paginationQueryValidation } from "./pagination.validation.js";
 
 const idParamsSchema = z.object({
-  id: z.string().regex(/^\d+$/, { message: "ID must be a number" }).transform(Number),
+  cabinId: z.string().regex(/^\d+$/, { message: "ID must be a number" }).transform(Number),
 });
 
 const createBookingBodySchema = z.object({
@@ -22,12 +22,12 @@ const listBookingsQuerySchema = z.object({
   startDateTo: z.coerce.date().optional(),
 });
 const listBookingWithPagQuerySchema = z.object({
-  ...paginationQueryValidation.query,
-  ...listBookingsQuerySchema,
+  ...paginationQueryValidation.query.shape,
+  ...listBookingsQuerySchema.shape,
 });
 
 const updateStatusBodySchema = z.object({
-  status: z.enum(["checkedIn", "checkedOut"]),
+  status: z.enum(["checkedIn", "checkedOut", "cancelled"]),
 });
 
 const bookedDatesQuerySchema = z
