@@ -39,7 +39,7 @@ const prismaErrorMap: Record<
   P2034: {
     statusCode: HTTP_STATUS.CONFLICT,
     code: ErrorCode.TRANSACTION_CONFLICT,
-    message: "Please try again",
+    message: "The request conflicted with another operation, please try again",
   },
 };
 

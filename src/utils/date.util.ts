@@ -15,3 +15,13 @@ export function todayInTimezone(timeZone: string, now: Date = new Date()): Date 
 export function nightsBetween(start: Date, end: Date): number {
   return Math.round((end.getTime() - start.getTime()) / DAY_MS);
 }
+
+/**
+ * افزودن روز به یک تاریخ UTC بدون وابستگی به timezone سرور.
+ * از setUTCDate استفاده می‌کنیم تا DST و منطقه‌ی زمانی محلی اثری نداشته باشد.
+ */
+export function addDaysUtc(date: Date, days: number): Date {
+  const result = new Date(date.getTime());
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}

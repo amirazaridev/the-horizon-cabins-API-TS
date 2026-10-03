@@ -1,4 +1,4 @@
-import { addMinutes, isAfter, isBefore, isPast } from "date-fns";
+import { addMinutes, isAfter, isBefore } from "date-fns";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Booking, UserRole } from "../generated/prisma/client.js";
 import { AppError } from "../utils/AppError.js";
@@ -8,6 +8,7 @@ import { getBookingSettings, TIMEZONE } from "../constants/booking.constants.js"
 import { isValidStatusTransition, hasFullBookingAccess } from "../utils/booking.util.js";
 import { simulatePaymentGateway } from "../utils/payment.util.js";
 import { calculateCabinPrice, calculateTotalPrice } from "../utils/booking-price.util.js";
+import { withSerializableRetry } from "../utils/transaction.util.js";
 import * as bookingRepository from "../repositories/booking.repository.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as guestRepository from "../repositories/guest.repository.js";
@@ -20,12 +21,12 @@ import type {
 import type { PaginatedResult, PaginationParams } from "../types/pagination.types.js";
 import { getPaginationMeta } from "../utils/pagination.utils.js";
 import type { BookedDatesQuery, BookingFilters } from "../types/booking.types.js";
-import { nightsBetween, todayInTimezone } from "../utils/date.util.js";
+import { addDaysUtc, nightsBetween, todayInTimezone } from "../utils/date.util.js";
 
 type CreateBookingInput = z.infer<typeof createBookingSchema.body>;
 type UpdateStatusInput = z.infer<typeof updateBookingStatusSchema.body>;
 
-function assertBookingOwnership(booking: Booking & { guest: { userId: number } }, userId: number) {
+function assertBookingOwnership(booking: { guest: { userId: number } }, userId: number) {
   if (booking.guest.userId !== userId) {
     throw new AppError(
       "You do not have permission to access this booking",
@@ -35,7 +36,17 @@ function assertBookingOwnership(booking: Booking & { guest: { userId: number } }
   }
 }
 
-async function getBookingOrThrow(id: number) {
+/** نسخه‌ی داخلی؛ شامل guest.userId برای چک ownership و وضعیت. */
+async function getBookingWithOwnerOrThrow(id: number) {
+  const booking = await bookingRepository.findBookingWithOwnerById(id);
+  if (!booking) {
+    throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
+  }
+  return booking;
+}
+
+/** نسخه‌ی پاسخ API؛ بدون guest.userId. بعد از هر عملیاتی که رکورد را تغییر می‌دهد استفاده می‌شود. */
+async function getBookingResponseOrThrow(id: number) {
   const booking = await bookingRepository.findBookingById(id);
   if (!booking) {
     throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);
@@ -44,6 +55,8 @@ async function getBookingOrThrow(id: number) {
 }
 
 export async function createBooking(input: CreateBookingInput, userId: number): Promise<Booking> {
+  const now = new Date();
+
   const guest = await guestRepository.findGuestByUserId(userId);
   if (!guest) {
     throw new AppError("Guest profile not found", HTTP_STATUS.FORBIDDEN, ErrorCode.FORBIDDEN);
@@ -51,10 +64,19 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
 
   const settings = getBookingSettings();
 
-  const today = todayInTimezone(TIMEZONE);
+  const today = todayInTimezone(TIMEZONE, now);
   if (isBefore(input.startDate, today)) {
     throw new AppError(
       "Start date cannot be in the past",
+      HTTP_STATUS.BAD_REQUEST,
+      ErrorCode.BOOKING_INVALID_DATE_RANGE,
+    );
+  }
+
+  //* حداکثر فاصله‌ی startDate از امروز
+  if (isAfter(input.startDate, addDaysUtc(today, settings.maxAdvanceBookingDays))) {
+    throw new AppError(
+      `Start date cannot be more than ${settings.maxAdvanceBookingDays} days in the future`,
       HTTP_STATUS.BAD_REQUEST,
       ErrorCode.BOOKING_INVALID_DATE_RANGE,
     );
@@ -94,56 +116,63 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
 
   const cabinPrice = calculateCabinPrice(cabin.regularPrice, cabin.discount);
   const totalPrice = calculateTotalPrice(cabinPrice, numNights);
-  const paymentDeadline = addMinutes(new Date(), settings.paymentDeadlineMinutes);
+  const paymentDeadline = addMinutes(now, settings.paymentDeadlineMinutes);
 
-  return prisma.$transaction(
-    async (tx) => {
+  //* تراکنش ممکن است چند بار اجرا شود؛ پس هیچ side effect بیرون از آن داخل callback نگذار.
+  return withSerializableRetry(() =>
+    prisma.$transaction(
+      async (tx) => {
+        await bookingRepository.expirePendingBookings(now, { cabinId: input.cabinId }, tx);
 
-      await bookingRepository.expirePendingBookings(new Date(), { cabinId: input.cabinId }, tx);
-
-      const overlapping = await bookingRepository.findOverlappingBooking(
-        input.cabinId,
-        input.startDate,
-        input.endDate,
-        tx,
-      );
-
-      if (overlapping) {
-        throw new AppError(
-          "Cabin is not available for the selected dates",
-          HTTP_STATUS.CONFLICT,
-          ErrorCode.BOOKING_DATE_OVERLAP,
+        const hasOverlap = await bookingRepository.hasOverlappingBooking(
+          input.cabinId,
+          input.startDate,
+          input.endDate,
+          now,
+          tx,
         );
-      }
 
-      const pendingCount = await bookingRepository.countPendingBookingsForGuest(guest.id, tx);
+        if (hasOverlap) {
+          throw new AppError(
+            "Cabin is not available for the selected dates",
+            HTTP_STATUS.CONFLICT,
+            ErrorCode.BOOKING_DATE_OVERLAP,
+          );
+        }
 
-      if (pendingCount >= settings.maxPendingBookingsPerGuest) {
-        throw new AppError(
-          `You can have at most ${settings.maxPendingBookingsPerGuest} pending bookings`,
-          HTTP_STATUS.CONFLICT,
-          ErrorCode.BOOKING_PENDING_LIMIT_EXCEEDED,
+        const pendingCount = await bookingRepository.countPendingBookingsForGuest(
+          now,
+          guest.id,
+          tx,
         );
-      }
 
-      return bookingRepository.createBooking(
-        {
-          startDate: input.startDate,
-          endDate: input.endDate,
-          numNights,
-          numGuests: input.numGuests,
-          cabinPrice,
-          totalPrice,
-          status: "pending",
-          paymentDeadline,
-          observations: input.observations,
-          cabin: { connect: { id: input.cabinId } },
-          guest: { connect: { id: guest.id } },
-        },
-        tx,
-      );
-    },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        if (pendingCount >= settings.maxPendingBookingsPerGuest) {
+          throw new AppError(
+            `You can have at most ${settings.maxPendingBookingsPerGuest} pending bookings`,
+            HTTP_STATUS.CONFLICT,
+            ErrorCode.BOOKING_PENDING_LIMIT_EXCEEDED,
+          );
+        }
+
+        return bookingRepository.createBooking(
+          {
+            startDate: input.startDate,
+            endDate: input.endDate,
+            numNights,
+            numGuests: input.numGuests,
+            cabinPrice,
+            totalPrice,
+            status: "pending",
+            paymentDeadline,
+            observations: input.observations,
+            cabin: { connect: { id: input.cabinId } },
+            guest: { connect: { id: guest.id } },
+          },
+          tx,
+        );
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    ),
   );
 }
 
@@ -167,17 +196,19 @@ export async function getAllBookings(
 }
 
 export async function getBookingById(id: number, userId: number, role: UserRole): Promise<Booking> {
-  const booking = await getBookingOrThrow(id);
+  const booking = await getBookingWithOwnerOrThrow(id);
 
   if (!hasFullBookingAccess(role)) {
     assertBookingOwnership(booking, userId);
   }
 
-  return booking;
+  return getBookingResponseOrThrow(id);
 }
 
 export async function payBooking(id: number, userId: number): Promise<Booking> {
-  const booking = await getBookingOrThrow(id);
+  const now = new Date();
+
+  const booking = await getBookingWithOwnerOrThrow(id);
   assertBookingOwnership(booking, userId);
 
   if (booking.status !== "pending") {
@@ -188,7 +219,8 @@ export async function payBooking(id: number, userId: number): Promise<Booking> {
     );
   }
 
-  if (isPast(booking.paymentDeadline)) {
+  //* هم‌خوان با شرط paymentDeadline > paidAt در confirmPendingBooking
+  if (booking.paymentDeadline <= now) {
     throw new AppError(
       "The payment deadline for this booking has passed",
       HTTP_STATUS.CONFLICT,
@@ -197,7 +229,7 @@ export async function payBooking(id: number, userId: number): Promise<Booking> {
   }
 
   const confirmed = await bookingRepository.confirmPendingBooking(id, {
-    paidAt: new Date(),
+    paidAt: now,
     paymentReference: simulatePaymentGateway(),
   });
 
@@ -209,11 +241,13 @@ export async function payBooking(id: number, userId: number): Promise<Booking> {
     );
   }
 
-  return getBookingOrThrow(id);
+  return getBookingResponseOrThrow(id);
 }
 
 export async function cancelBooking(id: number, userId: number): Promise<Booking> {
-  const booking = await getBookingOrThrow(id);
+  const now = new Date();
+
+  const booking = await getBookingWithOwnerOrThrow(id);
   assertBookingOwnership(booking, userId);
 
   if (booking.status !== "pending") {
@@ -223,7 +257,7 @@ export async function cancelBooking(id: number, userId: number): Promise<Booking
       ErrorCode.BOOKING_CANNOT_CANCEL,
     );
   }
-  const cancelled = await bookingRepository.cancelPendingBooking(id, new Date(), "userCancelled");
+  const cancelled = await bookingRepository.cancelPendingBooking(id, now, "userCancelled");
 
   if (!cancelled) {
     throw new AppError(
@@ -233,11 +267,13 @@ export async function cancelBooking(id: number, userId: number): Promise<Booking
     );
   }
 
-  return getBookingOrThrow(id);
+  return getBookingResponseOrThrow(id);
 }
 
 export async function updateBookingStatus(id: number, input: UpdateStatusInput): Promise<Booking> {
-  const booking = await getBookingOrThrow(id);
+  const now = new Date();
+
+  const booking = await getBookingWithOwnerOrThrow(id);
 
   if (!isValidStatusTransition(booking.status, input.status)) {
     throw new AppError(
@@ -247,9 +283,18 @@ export async function updateBookingStatus(id: number, input: UpdateStatusInput):
     );
   }
 
+  //* چک‌این فقط از تاریخ شروع رزرو به بعد مجاز است
+  if (input.status === "checkedIn" && isBefore(todayInTimezone(TIMEZONE, now), booking.startDate)) {
+    throw new AppError(
+      "Check-in is not allowed before the booking start date",
+      HTTP_STATUS.BAD_REQUEST,
+      ErrorCode.BOOKING_INVALID_STATUS_TRANSITION,
+    );
+  }
+
   const data: Prisma.BookingUpdateManyMutationInput =
     input.status === "cancelled"
-      ? { status: input.status, cancelledAt: new Date(), cancellationReason: "adminCancelled" }
+      ? { status: input.status, cancelledAt: now, cancellationReason: "adminCancelled" }
       : { status: input.status };
 
   const updated = await bookingRepository.transitionBookingStatus(id, booking.status, data);
@@ -262,11 +307,12 @@ export async function updateBookingStatus(id: number, input: UpdateStatusInput):
     );
   }
 
-  return getBookingOrThrow(id);
+  return getBookingResponseOrThrow(id);
 }
 
 export async function expirePendingBookings(): Promise<number> {
-  return bookingRepository.expirePendingBookings(new Date());
+  const now = new Date();
+  return bookingRepository.expirePendingBookings(now);
 }
 
 interface BookedRangeResult {
@@ -278,15 +324,27 @@ export async function getBookedDates(
   cabinId: number,
   query: BookedDatesQuery,
 ): Promise<BookedRangeResult[]> {
+  const now = new Date();
+
   const cabin = await cabinRepository.findCabinById(cabinId);
   if (!cabin) {
     throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
   }
 
-  const ranges = await bookingRepository.findBookedDateRanges(cabinId, {
-    from: query.from,
-    to: query.to,
-  });
+  const settings = getBookingSettings();
+
+  const from = query.from ?? todayInTimezone(TIMEZONE, now);
+  const to = query.to ?? addDaysUtc(from, settings.bookedDatesMaxRangeDays);
+
+  if (to.getTime() - from.getTime() > settings.bookedDatesMaxRangeDays * 86_400_000) {
+    throw new AppError(
+      `Date range cannot exceed ${settings.bookedDatesMaxRangeDays} days`,
+      HTTP_STATUS.BAD_REQUEST,
+      ErrorCode.BOOKING_INVALID_DATE_RANGE,
+    );
+  }
+
+  const ranges = await bookingRepository.findBookedDateRanges(cabinId, { from, to }, now);
 
   return ranges.map((range) => ({
     startDate: range.startDate,

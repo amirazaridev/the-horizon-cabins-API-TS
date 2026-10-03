@@ -2,6 +2,7 @@ import { prisma, PrismaTransactionClient } from "../config/database.js";
 import { OCCUPYING_STATUSES } from "../constants/booking.constants.js";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Booking, BookingStatus, CancellationReason } from "../generated/prisma/client.js";
+// نکته: Booking برای امضای توابع create/update همچنان لازم است.
 import { BookingFilters, FindAllBookingsParams } from "../types/booking.types.js";
 
 type Db = typeof prisma | PrismaTransactionClient;
@@ -49,7 +50,35 @@ export async function findAllBookings({ skip, limit, filters }: FindAllBookingsP
   return { data, total };
 }
 
-export async function findBookingById(id: number) {
+/** select پاسخ؛ شامل userId نیست چون نباید به کلاینت برسد. */
+const bookingResponseSelect = {
+  id: true,
+  startDate: true,
+  endDate: true,
+  numNights: true,
+  numGuests: true,
+  cabinPrice: true,
+  totalPrice: true,
+  status: true,
+  paymentDeadline: true,
+  paidAt: true,
+  paymentReference: true,
+  cancelledAt: true,
+  cancellationReason: true,
+  observations: true,
+  createdAt: true,
+  updatedAt: true,
+  cabinId: true,
+  guestId: true,
+  guest: { select: { id: true, fullName: true } },
+  cabin: { select: { id: true, name: true } },
+} satisfies Prisma.BookingSelect;
+
+/**
+ * نسخه‌ی داخلی برای سرویس؛ شامل `guest.userId` است تا چک ownership و وضعیت انجام شود.
+ * این خروجی هرگز مستقیماً به controller برنمی‌گردد.
+ */
+export async function findBookingWithOwnerById(id: number) {
   return prisma.booking.findUnique({
     where: { id },
     include: {
@@ -59,28 +88,40 @@ export async function findBookingById(id: number) {
   });
 }
 
-export async function findOverlappingBooking(
-  cabinId: number,
-  startDate: Date,
-  endDate: Date,
-  db: Db = prisma,
-): Promise<Booking | null> {
-  return db.booking.findFirst({
-    where: {
-      cabinId,
-      ...activeBookingFilter(new Date()),
-      startDate: { lt: endDate },
-      endDate: { gt: startDate },
-    },
+/** نسخه‌ی پاسخ API؛ `guest.userId` را برنمی‌گرداند. */
+export async function findBookingById(id: number) {
+  return prisma.booking.findUnique({
+    where: { id },
+    select: bookingResponseSelect,
   });
 }
 
+export async function hasOverlappingBooking(
+  cabinId: number,
+  startDate: Date,
+  endDate: Date,
+  now: Date,
+  db: Db = prisma,
+): Promise<boolean> {
+  const result = await db.booking.findFirst({
+    where: {
+      cabinId,
+      ...activeBookingFilter(now),
+      startDate: { lt: endDate },
+      endDate: { gt: startDate },
+    },
+    select: { id: true },
+  });
+  return result !== null;
+}
+
 export async function countPendingBookingsForGuest(
+  now: Date,
   guestId: number,
   db: Db = prisma,
 ): Promise<number> {
   return db.booking.count({
-    where: { guestId, status: "pending", paymentDeadline: { gt: new Date() } },
+    where: { guestId, status: "pending", paymentDeadline: { gt: now } },
   });
 }
 
@@ -95,15 +136,16 @@ export interface BookedRange {
  */
 export async function findBookedDateRanges(
   cabinId: number,
-  options: { from?: Date; to?: Date } = {},
+  range: { from: Date; to: Date },
+  now: Date,
   db: Db = prisma,
 ): Promise<BookedRange[]> {
   return db.booking.findMany({
     where: {
       cabinId,
-      ...activeBookingFilter(new Date()),
-      ...(options.to && { startDate: { lt: options.to } }),
-      ...(options.from && { endDate: { gt: options.from } }),
+      ...activeBookingFilter(now),
+      startDate: { lt: range.to },
+      endDate: { gt: range.from },
     },
     select: { startDate: true, endDate: true },
     orderBy: { startDate: "asc" },
