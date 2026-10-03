@@ -93,14 +93,8 @@ export async function findBookedDateRanges(
     where: {
       cabinId,
       status: { in: ACTIVE_BOOKING_STATUSES },
-      ...(options.from || options.to
-        ? {
-            endDate: {
-              ...(options.from ? { gte: options.from } : {}),
-              ...(options.to ? { lte: options.to } : {}),
-            },
-          }
-        : {}),
+      ...(options.to && { startDate: { lt: options.to } }),
+      ...(options.from && { endDate: { gt: options.from } }),
     },
     select: { startDate: true, endDate: true },
     orderBy: { startDate: "asc" },

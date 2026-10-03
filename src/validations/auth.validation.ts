@@ -25,10 +25,7 @@ const signupBodySchema = z.object({
    * بدون آن ثبت‌نام رد می‌شود؛ این تنها راه اثبات این است که کاربر
    * واقعاً به ایمیل دسترسی دارد.
    */
-  verificationToken: z
-    .string()
-    .min(1, { message: "Email verification is required" })
-    .trim(),
+  verificationToken: z.string().min(1, { message: "Email verification is required" }).trim(),
 });
 // نکته امنیتی: role عمداً اینجا نیست تا کاربر نتونه role خودش رو ست کنه (Mass Assignment)
 

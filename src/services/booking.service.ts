@@ -150,7 +150,7 @@ export async function getAllBookings(
   params: PaginationParams & {
     filters: BookingFilters;
     role: UserRole;
-    userId?: number;
+    userId: number;
   },
 ): Promise<PaginatedResult<Booking>> {
   const { skip, limit, page, filters, role, userId } = params;
@@ -165,11 +165,7 @@ export async function getAllBookings(
   return { data, meta: getPaginationMeta(total, page, limit) };
 }
 
-export async function getBookingById(
-  id: number,
-  userId: number,
-  role: UserRole,
-): Promise<Booking> {
+export async function getBookingById(id: number, userId: number, role: UserRole): Promise<Booking> {
   const booking = await bookingRepository.findBookingById(id);
   if (!booking) {
     throw new AppError("Booking not found", HTTP_STATUS.NOT_FOUND, ErrorCode.BOOKING_NOT_FOUND);

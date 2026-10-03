@@ -18,11 +18,7 @@ import type { RequestOtpInput, VerifyOtpInput } from "../validations/otp.validat
  * ایمیلی نمی‌فرستیم. این کار از کشف وجود حساب‌ها توسط مهاجم جلوگیری
  * می‌کند. مقادیر زمانی از سیاست سرویس می‌آید تا پاسخ‌ها یکدست بمانند.
  */
-export async function requestOtp(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
+export async function requestOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { email, purpose } = req.body as RequestOtpInput;
 
@@ -49,11 +45,7 @@ export async function requestOtp(
 }
 
 /** بررسی کد و صدور توکن یک‌بارمصرف تایید. */
-export async function verifyOtp(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
+export async function verifyOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { email, purpose, code } = req.body as VerifyOtpInput;
     const result = await otpService.verifyOtp(email, purpose, code);
