@@ -1,18 +1,13 @@
-import { addMinutes, isAfter, isPast } from "date-fns";
-import { randomUUID } from "crypto";
+import { addMinutes, isAfter, isBefore, isPast } from "date-fns";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Booking, UserRole } from "../generated/prisma/client.js";
 import { AppError } from "../utils/AppError.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
-import { getBookingSettings } from "../constants/booking.constants.js";
+import { getBookingSettings, TIMEZONE } from "../constants/booking.constants.js";
 import { isValidStatusTransition, hasFullBookingAccess } from "../utils/booking.util.js";
 import { simulatePaymentGateway } from "../utils/payment.util.js";
-import {
-  calculateCabinPrice,
-  calculateNumNights,
-  calculateTotalPrice,
-} from "../utils/booking-price.util.js";
+import { calculateCabinPrice, calculateTotalPrice } from "../utils/booking-price.util.js";
 import * as bookingRepository from "../repositories/booking.repository.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as guestRepository from "../repositories/guest.repository.js";
@@ -25,6 +20,7 @@ import type {
 import type { PaginatedResult, PaginationParams } from "../types/pagination.types.js";
 import { getPaginationMeta } from "../utils/pagination.utils.js";
 import type { BookedDatesQuery, BookingFilters } from "../types/booking.types.js";
+import { nightsBetween, todayInTimezone } from "../utils/date.util.js";
 
 type CreateBookingInput = z.infer<typeof createBookingSchema.body>;
 type UpdateStatusInput = z.infer<typeof updateBookingStatusSchema.body>;
@@ -55,7 +51,8 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
 
   const settings = getBookingSettings();
 
-  if (isPast(input.startDate)) {
+  const today = todayInTimezone(TIMEZONE);
+  if (isBefore(input.startDate, today)) {
     throw new AppError(
       "Start date cannot be in the past",
       HTTP_STATUS.BAD_REQUEST,
@@ -71,7 +68,7 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
     );
   }
 
-  const numNights = calculateNumNights(input.startDate, input.endDate);
+  const numNights = nightsBetween(input.startDate, input.endDate);
 
   if (numNights < settings.minBookingLengthNights || numNights > settings.maxBookingLengthNights) {
     throw new AppError(
@@ -101,6 +98,9 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
 
   return prisma.$transaction(
     async (tx) => {
+
+      await bookingRepository.expirePendingBookings(new Date(), { cabinId: input.cabinId }, tx);
+
       const overlapping = await bookingRepository.findOverlappingBooking(
         input.cabinId,
         input.startDate,
@@ -188,7 +188,7 @@ export async function payBooking(id: number, userId: number): Promise<Booking> {
     );
   }
 
-  if (booking.paymentDeadline && isPast(booking.paymentDeadline)) {
+  if (isPast(booking.paymentDeadline)) {
     throw new AppError(
       "The payment deadline for this booking has passed",
       HTTP_STATUS.CONFLICT,

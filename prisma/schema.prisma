@@ -198,16 +198,16 @@ model CabinCategory {
 model Booking {
   id                 Int                 @id @default(autoincrement())
 
-  startDate          DateTime            @map("start_date")
-  endDate            DateTime            @map("end_date")
+  startDate          DateTime            @map("start_date")   @db.Date
+  endDate            DateTime            @map("end_date")     @db.Date
   numNights          Int                 @map("num_nights")
   numGuests          Int                 @map("num_guests")
 
   cabinPrice         Int                 @map("cabin_price")
-  totalPrice         BigInt              @map("total_price")
+  totalPrice         Int                 @map("total_price")
 
   status             BookingStatus       @default(pending)
-  paymentDeadline    DateTime?           @map("payment_deadline")
+  paymentDeadline    DateTime            @map("payment_deadline")
   paidAt             DateTime?           @map("paid_at")
   paymentReference   String?             @map("payment_reference")
 
