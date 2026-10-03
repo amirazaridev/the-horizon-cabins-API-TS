@@ -10,6 +10,8 @@ export const BOOKING_CONSTANTS = {
   MIN_BOOKING_LENGTH_NIGHTS: 1,
   MAX_BOOKING_LENGTH_NIGHTS: 30,
   MAX_GUESTS_PER_BOOKING: 10,
+  MAX_ADVANCE_BOOKING_DAYS: 365,
+  BOOKED_DATES_MAX_RANGE_DAYS: 366,
   EXPIRATION_CHECK_CRON: "*/1 * * * *",
 } as const;
 
@@ -30,6 +32,8 @@ interface BookingSettings {
   minBookingLengthNights: number;
   maxBookingLengthNights: number;
   maxGuestsPerBooking: number;
+  maxAdvanceBookingDays: number;
+  bookedDatesMaxRangeDays: number;
   expirationCheckCron: string;
 }
 
@@ -40,6 +44,8 @@ export function getBookingSettings(): BookingSettings {
     minBookingLengthNights: BOOKING_CONSTANTS.MIN_BOOKING_LENGTH_NIGHTS,
     maxBookingLengthNights: BOOKING_CONSTANTS.MAX_BOOKING_LENGTH_NIGHTS,
     maxGuestsPerBooking: BOOKING_CONSTANTS.MAX_GUESTS_PER_BOOKING,
+    maxAdvanceBookingDays: BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS,
+    bookedDatesMaxRangeDays: BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS,
     expirationCheckCron: BOOKING_CONSTANTS.EXPIRATION_CHECK_CRON,
   };
 }

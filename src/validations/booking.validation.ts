@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { safeNumber } from "../utils/safeParseNumber.js";
 import { paginationQueryValidation } from "./pagination.validation.js";
+import { BookingStatus } from "../generated/prisma/enums.js";
+import { BOOKING_CONSTANTS } from "../constants/booking.constants.js";
+
+const DAY_MS = 86_400_000;
 
 const dateOnlySchema = z
   .string()
@@ -28,7 +32,7 @@ const createBookingBodySchema = z.object({
 });
 
 const listBookingsQuerySchema = z.object({
-  status: z.enum(["pending", "confirmed", "cancelled", "checkedIn", "checkedOut"]).optional(),
+  status: z.enum(BookingStatus).optional(),
   cabinId: z.preprocess(safeNumber, z.number().int().positive().optional()),
   guestId: z.preprocess(safeNumber, z.number().int().positive().optional()),
   startDateFrom: dateOnlySchema.optional(),
@@ -39,8 +43,13 @@ const listBookingWithPagQuerySchema = z.object({
   ...listBookingsQuerySchema.shape,
 });
 
+/** فقط وضعیت‌هایی که ادمین مجاز است روی آن‌ها ترنزیشن بزند. */
+const updatableBookingStatusSchema = z
+  .enum(BookingStatus)
+  .extract(["checkedIn", "checkedOut", "cancelled"]);
+
 const updateStatusBodySchema = z.object({
-  status: z.enum(["checkedIn", "checkedOut", "cancelled"]),
+  status: updatableBookingStatusSchema,
 });
 
 const bookedDatesQuerySchema = z
@@ -51,7 +60,18 @@ const bookedDatesQuerySchema = z
   .refine((range) => !range.from || !range.to || range.from <= range.to, {
     message: "from must be before or equal to to",
     path: ["from"],
-  });
+  })
+  .refine(
+    (range) =>
+      !range.from ||
+      !range.to ||
+      (range.to.getTime() - range.from.getTime()) / DAY_MS <=
+        BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS,
+    {
+      message: `Date range cannot exceed ${BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS} days`,
+      path: ["to"],
+    },
+  );
 
 export const createBookingSchema = { body: createBookingBodySchema };
 export const listBookingsQueryValidation = { query: listBookingWithPagQuerySchema };
