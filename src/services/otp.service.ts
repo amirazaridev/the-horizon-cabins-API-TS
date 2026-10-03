@@ -247,14 +247,8 @@ export async function invalidateVerificationToken(recordId: number): Promise<voi
 /* ------------------------------------------------------------------ */
 
 /** محدودیت نرخ ارسال: سقف در بازه + cooldown بین دو ارسال. */
-async function enforceSendRateLimit(
-  email: string,
-  purpose: OtpPurpose,
-  now: Date,
-): Promise<void> {
-  const windowStart = new Date(
-    now.getTime() - OTP_POLICY.rateLimitWindowHours * 60 * 60 * 1000,
-  );
+async function enforceSendRateLimit(email: string, purpose: OtpPurpose, now: Date): Promise<void> {
+  const windowStart = new Date(now.getTime() - OTP_POLICY.rateLimitWindowHours * 60 * 60 * 1000);
 
   const sendsInWindow = await otpRepository.countVerificationCodesSince(
     email,
@@ -289,11 +283,7 @@ async function enforceSendRateLimit(
  * اگر کد pending قدیمی منقضی شده، وضعیتش را به expired تغییر می‌دهد.
  * صرفاً برای پاکیزگی داده؛ رفتار کاربر را عوض نمی‌کند.
  */
-async function markExpiredIfNeeded(
-  email: string,
-  purpose: OtpPurpose,
-  now: Date,
-): Promise<void> {
+async function markExpiredIfNeeded(email: string, purpose: OtpPurpose, now: Date): Promise<void> {
   const latest = await otpRepository.findLatestVerificationCode(email, purpose);
   if (latest && latest.status === "pending" && latest.expiresAt <= now) {
     await otpRepository.revokePendingVerificationCodes(email, purpose);

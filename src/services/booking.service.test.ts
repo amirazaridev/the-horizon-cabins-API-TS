@@ -4,7 +4,7 @@ import * as bookingService from "./booking.service.js";
 import * as bookingRepository from "../repositories/booking.repository.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as guestRepository from "../repositories/guest.repository.js";
-import { isValidStatusTransition } from "../utils/booking-status.util.js";
+import { isValidStatusTransition } from "../utils/booking.util.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 
@@ -24,7 +24,7 @@ describe("booking.service", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-06-15T12:00:00Z"));
     vi.clearAllMocks();
-    vi.mocked(bookingRepository.findOverlappingBooking).mockResolvedValue(null);
+    vi.mocked(bookingRepository.hasOverlappingBooking).mockResolvedValue(false);
     vi.mocked(bookingRepository.countPendingBookingsForGuest).mockResolvedValue(0);
   });
 
@@ -163,10 +163,7 @@ describe("booking.service", () => {
     it("should reject when dates overlap with existing booking", async () => {
       vi.mocked(cabinRepository.findCabinById).mockResolvedValue(mockCabin as never);
       vi.mocked(guestRepository.findGuestByUserId).mockResolvedValue(mockGuest as never);
-      vi.mocked(bookingRepository.findOverlappingBooking).mockResolvedValue({
-        id: 99,
-        status: "confirmed",
-      } as never);
+      vi.mocked(bookingRepository.hasOverlappingBooking).mockResolvedValue(true);
 
       const mockTx = mockTransaction();
       await stubTransaction(mockTx);
@@ -264,9 +261,7 @@ describe("booking.service", () => {
     });
 
     it("should cancel a pending booking successfully", async () => {
-      vi.mocked(bookingRepository.findBookingById).mockResolvedValue(
-        mockBooking({}) as never,
-      );
+      vi.mocked(bookingRepository.findBookingById).mockResolvedValue(mockBooking({}) as never);
       vi.mocked(bookingRepository.updateBooking).mockResolvedValue({
         status: "cancelled",
         cancellationReason: "userCancelled",

@@ -34,10 +34,7 @@ const idParamsSchema = z.object({
 });
 
 const regionIdParamsSchema = z.object({
-  regionId: z
-    .string()
-    .regex(/^\d+$/, { message: "Region ID must be a number" })
-    .transform(Number),
+  regionId: z.string().regex(/^\d+$/, { message: "Region ID must be a number" }).transform(Number),
 });
 
 // -------------------------------------

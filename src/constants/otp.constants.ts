@@ -1,27 +1,19 @@
 import env from "../config/env.js";
 
-/**
- * ثابت‌های دامنه‌ی OTP — تک‌منبع حقیقت برای همه‌ی مقادیر.
- *
- * ⚠️ چرا از `env` می‌خوانیم و نه هاردکد؟
- * این مقادیر سیاست امنیتی‌اند و باید بدون تغییر کد قابل تنظیم باشند
- * (مثلاً در staging عمر کد را کوتاه‌تر کنیم). ضمناً فرانت هم باید همین
- * مقادیر را از پاسخ API بگیرد تا تایمر ارسال مجدد با سرور هم‌داستان بماند.
- */
 export const OTP_POLICY = {
-  /** طول کد تایید (تعداد ارقام). */
+  //? طول کد تایید (تعداد ارقام).
   length: env.OTP_LENGTH,
-  /** مدت اعتبار کد به ثانیه. */
+  //? مدت اعتبار کد به ثانیه.
   ttlSeconds: env.OTP_TTL_SECONDS,
-  /** سقف تلاش اشتباه روی یک کد. */
+  //? سقف تلاش اشتباه روی یک کد.
   maxAttempts: env.OTP_MAX_ATTEMPTS,
-  /** فاصله‌ی حداقلی ارسال مجدد به یک ایمیل (ثانیه). */
+  //? فاصله‌ی حداقلی ارسال مجدد به یک ایمیل (ثانیه).
   resendCooldownSeconds: env.OTP_RESEND_COOLDOWN_SECONDS,
-  /** سقف ارسال در هر بازه. */
+  //? سقف ارسال در هر بازه.
   maxSendsPerWindow: env.OTP_MAX_SENDS_PER_WINDOW,
-  /** طول بازه‌ی محدودیت نرخ (ساعت). */
+  //? طول بازه‌ی محدودیت نرخ (ساعت).
   rateLimitWindowHours: env.OTP_RATE_LIMIT_WINDOW_HOURS,
-  /** مدت اعتبار توکن تایید ایمیل (ثانیه). */
+  //? مدت اعتبار توکن تایید ایمیل (ثانیه).
   verificationTokenTtlSeconds: env.OTP_VERIFICATION_TOKEN_TTL_SECONDS,
 } as const;
 
