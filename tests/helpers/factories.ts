@@ -203,15 +203,33 @@ export interface CreatePriceRuleOptions {
 /** ساخت قاعده‌ی قیمت‌گذاری برای تست‌های repository/service. */
 export async function createPriceRule(options: CreatePriceRuleOptions) {
   const id = nextId();
+  const kind: PriceRuleKind = options.kind ?? "dateRange";
+
+  // پیش‌فرض‌ها باید CHECK دیتابیس را برآورده کنند: dateRange نیازمند هر دو تاریخ،
+  // و weekday نیازمند لیست غیرخالی است.
+  const startDate =
+    options.startDate !== undefined
+      ? options.startDate
+      : kind === "dateRange"
+        ? utcDate("2026-06-01")
+        : null;
+  const endDate =
+    options.endDate !== undefined
+      ? options.endDate
+      : kind === "dateRange"
+        ? utcDate("2026-06-05")
+        : null;
+  const weekdays = options.weekdays ?? (kind === "weekday" ? [3] : []);
+
   return prisma.priceRule.create({
     data: {
       cabinId: options.cabinId,
       type: options.type ?? "discount",
-      kind: options.kind ?? "dateRange",
+      kind,
       percent: options.percent ?? 10,
-      startDate: options.startDate ?? null,
-      endDate: options.endDate ?? null,
-      weekdays: options.weekdays ?? [],
+      startDate,
+      endDate,
+      weekdays,
       label: options.label ?? `Rule ${id}`,
       isActive: options.isActive ?? true,
       createdById: options.actorId,

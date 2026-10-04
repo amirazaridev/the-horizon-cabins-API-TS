@@ -1,9 +1,13 @@
 import { Router } from "express";
 import * as cabinController from "../controllers/cabin.controller.js";
+import * as priceRuleController from "../controllers/price-rule.controller.js";
 import { validate } from "../middlewares/validate.middleware.js";
+import { protect, restrictTo } from "../middlewares/auth.middleware.js";
 import * as cabinValidation from "../validations/cabin.validation.js";
 import * as categoryValidation from "../validations/category.validation.js";
+import * as priceRuleValidation from "../validations/price-rule.validation.js";
 import { paginationMiddleware } from "../middlewares/pagination.middleware.js";
+import { BOOKING_ADMIN_ROLES } from "../constants/booking.constants.js";
 
 const router = Router();
 
@@ -16,6 +20,22 @@ router
   )
   .post(cabinController.createCabin);
 router.route("/amenities").get(cabinController.getAllAmenities);
+
+//? قواعد قیمت‌گذاری یک کابین — فقط admin|owner.
+router
+  .route("/:cabinId/price-rules")
+  .get(
+    protect,
+    restrictTo(...BOOKING_ADMIN_ROLES),
+    validate(priceRuleValidation.listCabinPriceRulesSchema),
+    priceRuleController.list,
+  )
+  .post(
+    protect,
+    restrictTo(...BOOKING_ADMIN_ROLES),
+    validate(priceRuleValidation.createCabinPriceRuleSchema),
+    priceRuleController.create,
+  );
 
 router
   .route("/:id/categories")

@@ -10,6 +10,9 @@ import type {
 
 type Db = typeof prisma | PrismaTransactionClient;
 
+/** حداکثر تعداد ردیف در هر درج گروهی. */
+const INSERT_CHUNK_SIZE = 5_000;
+
 export interface PriceRuleFilters {
   type?: PriceRuleType;
   kind?: PriceRuleKind;
@@ -60,6 +63,23 @@ export async function createManyRules(
   if (data.length === 0) return 0;
   const { count } = await db.priceRule.createMany({ data });
   return count;
+}
+
+/** درج گروهی chunked و بازگرداندن id/cabinId ردیف‌های ساخته‌شده (برای audit). */
+export async function createManyRulesAndReturn(
+  data: Prisma.PriceRuleUncheckedCreateInput[],
+  db: Db = prisma,
+): Promise<{ id: number; cabinId: number }[]> {
+  const created: { id: number; cabinId: number }[] = [];
+  for (let i = 0; i < data.length; i += INSERT_CHUNK_SIZE) {
+    const chunk = data.slice(i, i + INSERT_CHUNK_SIZE);
+    const rows = await db.priceRule.createManyAndReturn({
+      data: chunk,
+      select: { id: true, cabinId: true },
+    });
+    created.push(...rows);
+  }
+  return created;
 }
 
 export async function updateRule(
@@ -124,6 +144,25 @@ export async function findAuditsByRuleId(ruleId: number, db: Db = prisma): Promi
     where: { ruleId },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
+}
+
+/** درج گروهی chunked ردیف‌های audit (برای bulk). */
+export async function createManyAudits(data: AuditInput[], db: Db = prisma): Promise<number> {
+  if (data.length === 0) return 0;
+  let total = 0;
+  for (let i = 0; i < data.length; i += INSERT_CHUNK_SIZE) {
+    const chunk = data.slice(i, i + INSERT_CHUNK_SIZE).map((audit) => ({
+      ruleId: audit.ruleId,
+      cabinId: audit.cabinId,
+      action: audit.action,
+      actorId: audit.actorId,
+      ...(audit.before !== undefined && { before: audit.before }),
+      ...(audit.after !== undefined && { after: audit.after }),
+    }));
+    const { count } = await db.priceRuleAudit.createMany({ data: chunk });
+    total += count;
+  }
+  return total;
 }
 
 export async function findAllCabinIds(db: Db = prisma): Promise<number[]> {

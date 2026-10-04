@@ -6,6 +6,7 @@ import otpRouter from "./otp.route.js";
 import categoryRouter from "./category.route.js";
 import bookingRouter from "./booking.route.js";
 import locationRouter from "./location.route.js";
+import priceRuleRouter from "./price-rule.route.js";
 
 const router = Router();
 router.use("/auth", authRouter);
@@ -15,5 +16,6 @@ router.use("/categories", categoryRouter);
 router.use("/cabins", cabinRouter);
 router.use("/bookings", bookingRouter);
 router.use("/locations", locationRouter);
+router.use("/price-rules", priceRuleRouter);
 
 export default router;

@@ -55,6 +55,7 @@ export const errorHandler = (err: unknown, req: Request, res: Response, _next: N
     code = err.code;
     message = err.message;
     isOperational = err.isOperational;
+    details = err.details;
   } else if (err instanceof ZodError) {
     statusCode = HTTP_STATUS.BAD_REQUEST;
     code = ErrorCode.VALIDATION_ERROR;

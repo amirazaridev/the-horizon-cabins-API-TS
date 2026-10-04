@@ -3,25 +3,9 @@ import { safeNumber } from "../utils/safeParseNumber.js";
 import { paginationQueryValidation } from "./pagination.validation.js";
 import { BookingStatus } from "../generated/prisma/enums.js";
 import { BOOKING_CONSTANTS } from "../constants/booking.constants.js";
+import { cabinIdParamsSchema, dateOnlySchema, idParamsSchema } from "./shared.validation.js";
 
 const DAY_MS = 86_400_000;
-
-const dateOnlySchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
-  .refine((s) => {
-    const d = new Date(`${s}T00:00:00.000Z`);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-  }, "Invalid calendar date")
-  .transform((s) => new Date(`${s}T00:00:00.000Z`));
-
-const idParamsSchema = z.object({
-  id: z.string().regex(/^\d+$/, { message: "ID must be a number" }).transform(Number),
-});
-
-const cabinIdParamsSchema = z.object({
-  cabinId: z.string().regex(/^\d+$/, { message: "ID must be a number" }).transform(Number),
-});
 
 const createBookingBodySchema = z.object({
   cabinId: z.preprocess(safeNumber, z.number().int().positive()),
