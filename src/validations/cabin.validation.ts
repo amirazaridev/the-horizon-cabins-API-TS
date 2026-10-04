@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { safeNumber } from "../utils/safeParseNumber.js";
 import { safeArray } from "../utils/safeArray.js";
+import { MAX_REGULAR_PRICE, MIN_REGULAR_PRICE } from "../constants/pricing.constants.js";
 
 import { paginationQueryValidation } from "./pagination.validation.js";
 import { categorySlugQueryValidation } from "./category.validation.js";
@@ -31,22 +32,13 @@ const cabinBodySchema = z.object({
     z
       .number()
       .int({ message: "Price must be an integer" })
-      .min(0, { message: "Price cannot be negative" })
-      .max(100_000_000, {
-        message: "Price cannot exceed 100,000,000",
+      .min(MIN_REGULAR_PRICE, {
+        message: `Price cannot be less than ${MIN_REGULAR_PRICE}`,
+      })
+      .max(MAX_REGULAR_PRICE, {
+        message: `Price cannot exceed ${MAX_REGULAR_PRICE}`,
       }),
   ),
-
-  discount: z
-    .preprocess(
-      safeNumber,
-      z
-        .number()
-        .int({ message: "Discount must be an integer" })
-        .min(0, { message: "Discount cannot be negative" })
-        .max(100, { message: "Discount cannot exceed 100%" }),
-    )
-    .default(0),
 
   description: z.string().trim().max(1000, {
     message: "Description cannot exceed 1000 characters",

@@ -121,16 +121,6 @@ export async function updateCabin(
   if (!existingCabin)
     throw new AppError(`Cabin with id ${id} not found`, HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
 
-  const finalPrice = input.regularPrice ?? Number(existingCabin.regularPrice);
-  const finalDiscount = input.discount ?? existingCabin.discount;
-  if (finalDiscount > finalPrice) {
-    throw new AppError(
-      "The discount cannot exceed the original price.",
-      HTTP_STATUS.BAD_REQUEST,
-      ErrorCode.VALIDATION_ERROR,
-    );
-  }
-
   const uploadedUrls = await uploadCabinImages(imageFiles);
   const finalImages = [...(input.keepExistingImages ?? []), ...uploadedUrls];
 

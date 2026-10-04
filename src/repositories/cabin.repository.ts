@@ -1,7 +1,9 @@
-import { prisma } from "../config/database.js";
+import { prisma, PrismaTransactionClient } from "../config/database.js";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Cabin } from "../generated/prisma/client.js";
 import { CabinFilters, CabinWithCity } from "../types/cabin.types.js";
+
+type Db = typeof prisma | PrismaTransactionClient;
 
 interface FindAllCabinsParams {
   skip?: number;
@@ -68,7 +70,8 @@ export async function findAllCabins({
 
     const { min, max } = filters.price!;
     const filtered = allCabins.filter((cabin) => {
-      const finalPrice = cabin.regularPrice - cabin.discount;
+      //* قیمت شبانه‌ی مؤثر از تقویم قیمت می‌آید (P6)؛ فعلاً regularPrice مبناست.
+      const finalPrice = cabin.regularPrice;
       return finalPrice >= min && finalPrice <= max;
     });
 
@@ -129,8 +132,8 @@ export async function findAllAmenities(): Promise<string[]> {
   return [...new Set(amenities)];
 }
 
-export async function findCabinById(id: number): Promise<Cabin | null> {
-  return prisma.cabin.findUnique({ where: { id } });
+export async function findCabinById(id: number, db: Db = prisma): Promise<Cabin | null> {
+  return db.cabin.findUnique({ where: { id } });
 }
 
 export async function createCabin(data: Prisma.CabinCreateInput): Promise<Cabin> {

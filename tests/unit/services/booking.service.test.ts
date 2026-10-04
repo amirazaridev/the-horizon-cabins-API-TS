@@ -48,7 +48,6 @@ function stubDefaults() {
     id: 1,
     maxCapacity: 4,
     regularPrice: 1_000_000,
-    discount: 10,
   } as never);
   vi.mocked(bookingRepository.hasOverlappingBooking).mockResolvedValue(false);
   vi.mocked(bookingRepository.countPendingBookingsForGuest).mockResolvedValue(0);
@@ -98,8 +97,8 @@ describe("booking.service", () => {
           endDate: validInput.endDate,
           numNights: 2,
           numGuests: 2,
-          cabinPrice: 900_000, // 1,000,000 با ۱۰٪ تخفیف
-          totalPrice: 1_800_000,
+          cabinPrice: 1_000_000, // بدون قاعده‌ی تخفیف: برابر regularPrice
+          totalPrice: 2_000_000,
           status: "pending",
           paymentDeadline: new Date(
             NOW.getTime() + BOOKING_CONSTANTS.PAYMENT_DEADLINE_MINUTES * 60_000,
@@ -235,7 +234,6 @@ describe("booking.service", () => {
         id: 1,
         maxCapacity: 50,
         regularPrice: 1_000_000,
-        discount: 0,
       } as never);
 
       // maxGuestsPerBooking = 10 → 11 مهمان باید رد شود.

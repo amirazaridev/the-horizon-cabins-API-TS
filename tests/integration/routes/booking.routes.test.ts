@@ -20,7 +20,7 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.routes (integration)", () 
 
   beforeEach(async () => {
     await resetDatabase();
-    cabinId = (await createCabin({ regularPrice: 1_000_000, discount: 10, maxCapacity: 4 })).id;
+    cabinId = (await createCabin({ regularPrice: 1_000_000, maxCapacity: 4 })).id;
     guest = await createUser({ role: "guest" });
     otherGuest = await createUser({ role: "guest" });
     admin = await createUser({ role: "admin", withGuest: false });

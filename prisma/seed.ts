@@ -5,6 +5,8 @@ import { seedCabins } from "./seeds/cabin.seed";
 import { seedCities } from "./seeds/city.seed";
 import { seedCategories } from "./seeds/category.seed";
 import { seedCabinCategories } from "./seeds/cabin-category.seed";
+import { seedPriceRules } from "./seeds/price-rule.seed";
+import { rebuildAllCabinPriceCalendars } from "../src/services/price-calendar.service";
 
 /**
  * The seed data uses explicit primary keys, and PostgreSQL does not advance a
@@ -31,9 +33,15 @@ async function main() {
   await seedCabins();
   await seedCabinCategories();
 
+  // Sample pricing rules + their daily price calendars (built by the engine).
+  const ruleCount = await seedPriceRules();
+  const calendarRows = await rebuildAllCabinPriceCalendars();
+
   await syncSequences(["regions", "cities", "categories", "cabins"]);
 
-  logger.info("✅ Seeding finished.");
+  logger.info(
+    `✅ Seeding finished. (${ruleCount} sample price rules, ${calendarRows} calendar rows)`,
+  );
 }
 /* eslint-disable n/no-process-exit */
 main()

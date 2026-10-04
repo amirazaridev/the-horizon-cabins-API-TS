@@ -114,7 +114,9 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
     );
   }
 
-  const cabinPrice = calculateCabinPrice(cabin.regularPrice, cabin.discount);
+  //* Cabin.discount حذف شده است؛ تخفیف‌ها فقط به‌صورت PriceRule وجود دارند.
+  //* محاسبه‌ی مبتنی بر موتور قیمت‌گذاری در فاز بعدی (P5) جایگزین می‌شود.
+  const cabinPrice = calculateCabinPrice(cabin.regularPrice, 0);
   const totalPrice = calculateTotalPrice(cabinPrice, numNights);
   const paymentDeadline = addMinutes(now, settings.paymentDeadlineMinutes);
 
