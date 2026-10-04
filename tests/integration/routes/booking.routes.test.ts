@@ -60,15 +60,12 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.routes (integration)", () 
     });
 
     it("should reject a full ISO datetime for startDate", async () => {
-      const res = await request(app)
-        .post(BOOKINGS_PATH)
-        .set("Cookie", cookieFor(guest))
-        .send({
-          cabinId,
-          startDate: "2027-01-01T10:00:00.000Z",
-          endDate: "2027-01-03",
-          numGuests: 2,
-        });
+      const res = await request(app).post(BOOKINGS_PATH).set("Cookie", cookieFor(guest)).send({
+        cabinId,
+        startDate: "2027-01-01T10:00:00.000Z",
+        endDate: "2027-01-03",
+        numGuests: 2,
+      });
 
       expect(res.status).toBe(400);
     });
@@ -202,8 +199,20 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.routes (integration)", () 
   // ==================================================================
   describe("GET /bookings", () => {
     beforeEach(async () => {
-      await createBooking({ cabinId, guestId: guest.guestId!, status: "confirmed", startDate: utcDate("2030-06-01"), endDate: utcDate("2030-06-03") });
-      await createBooking({ cabinId, guestId: otherGuest.guestId!, status: "pending", startDate: utcDate("2030-07-01"), endDate: utcDate("2030-07-03") });
+      await createBooking({
+        cabinId,
+        guestId: guest.guestId!,
+        status: "confirmed",
+        startDate: utcDate("2030-06-01"),
+        endDate: utcDate("2030-06-03"),
+      });
+      await createBooking({
+        cabinId,
+        guestId: otherGuest.guestId!,
+        status: "pending",
+        startDate: utcDate("2030-07-01"),
+        endDate: utcDate("2030-07-03"),
+      });
     });
 
     it("should require authentication", async () => {
@@ -441,7 +450,11 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.routes (integration)", () 
   // ==================================================================
   describe("PATCH /bookings/:id/status", () => {
     it("should require authentication", async () => {
-      const booking = await createBooking({ cabinId, guestId: guest.guestId!, status: "confirmed" });
+      const booking = await createBooking({
+        cabinId,
+        guestId: guest.guestId!,
+        status: "confirmed",
+      });
       const res = await request(app)
         .patch(`${BOOKINGS_PATH}/${booking.id}/status`)
         .send({ status: "checkedIn" });
@@ -449,7 +462,11 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.routes (integration)", () 
     });
 
     it("should reject a guest with 403", async () => {
-      const booking = await createBooking({ cabinId, guestId: guest.guestId!, status: "confirmed" });
+      const booking = await createBooking({
+        cabinId,
+        guestId: guest.guestId!,
+        status: "confirmed",
+      });
       const res = await request(app)
         .patch(`${BOOKINGS_PATH}/${booking.id}/status`)
         .set("Cookie", cookieFor(guest))
@@ -458,7 +475,11 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.routes (integration)", () 
     });
 
     it("should reject the non-updatable statuses with 400", async () => {
-      const booking = await createBooking({ cabinId, guestId: guest.guestId!, status: "confirmed" });
+      const booking = await createBooking({
+        cabinId,
+        guestId: guest.guestId!,
+        status: "confirmed",
+      });
       for (const status of ["pending", "confirmed"]) {
         const res = await request(app)
           .patch(`${BOOKINGS_PATH}/${booking.id}/status`)
@@ -506,7 +527,11 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.routes (integration)", () 
     });
 
     it("should let owner cancel a confirmed booking", async () => {
-      const booking = await createBooking({ cabinId, guestId: guest.guestId!, status: "confirmed" });
+      const booking = await createBooking({
+        cabinId,
+        guestId: guest.guestId!,
+        status: "confirmed",
+      });
       const res = await request(app)
         .patch(`${BOOKINGS_PATH}/${booking.id}/status`)
         .set("Cookie", cookieFor(owner))

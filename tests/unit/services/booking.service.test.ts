@@ -40,7 +40,10 @@ function p2034(): Prisma.PrismaClientKnownRequestError {
 
 /** پیش‌فرض‌های مشترک mockها. */
 function stubDefaults() {
-  vi.mocked(guestRepository.findGuestByUserId).mockResolvedValue({ id: 10, userId: USER_ID } as never);
+  vi.mocked(guestRepository.findGuestByUserId).mockResolvedValue({
+    id: 10,
+    userId: USER_ID,
+  } as never);
   vi.mocked(cabinRepository.findCabinById).mockResolvedValue({
     id: 1,
     maxCapacity: 4,
@@ -73,9 +76,8 @@ describe("booking.service", () => {
 
     // اجرای واقعی callback تراکنش با یک txmock.
     const txStub = {};
-    vi.mocked(prisma.$transaction).mockImplementation(
-      ((callback: (tx: unknown) => unknown) => callback(txStub)) as never,
-    );
+    vi.mocked(prisma.$transaction).mockImplementation(((callback: (tx: unknown) => unknown) =>
+      callback(txStub)) as never);
   });
 
   afterEach(() => {
@@ -99,7 +101,9 @@ describe("booking.service", () => {
           cabinPrice: 900_000, // 1,000,000 با ۱۰٪ تخفیف
           totalPrice: 1_800_000,
           status: "pending",
-          paymentDeadline: new Date(NOW.getTime() + BOOKING_CONSTANTS.PAYMENT_DEADLINE_MINUTES * 60_000),
+          paymentDeadline: new Date(
+            NOW.getTime() + BOOKING_CONSTANTS.PAYMENT_DEADLINE_MINUTES * 60_000,
+          ),
           cabin: { connect: { id: 1 } },
           guest: { connect: { id: 10 } },
         }),
@@ -317,7 +321,9 @@ describe("booking.service", () => {
 
     it("should retry on P2034 and resolve on a later attempt", async () => {
       let attempt = 0;
-      vi.mocked(prisma.$transaction).mockImplementation((async (callback: (tx: unknown) => unknown) => {
+      vi.mocked(prisma.$transaction).mockImplementation((async (
+        callback: (tx: unknown) => unknown,
+      ) => {
         attempt += 1;
         if (attempt === 1) throw p2034();
         return callback({});
@@ -376,7 +382,11 @@ describe("booking.service", () => {
     it("should pass the filters through unchanged for admin", async () => {
       vi.mocked(bookingRepository.findAllBookings).mockResolvedValue({ data: [], total: 0 });
 
-      await bookingService.getAllBookings({ ...params, role: "admin", filters: { status: "pending" } });
+      await bookingService.getAllBookings({
+        ...params,
+        role: "admin",
+        filters: { status: "pending" },
+      });
 
       expect(bookingRepository.findAllBookings).toHaveBeenCalledWith({
         skip: 0,
@@ -422,7 +432,12 @@ describe("booking.service", () => {
     it("should build the pagination meta from total/page/limit", async () => {
       vi.mocked(bookingRepository.findAllBookings).mockResolvedValue({ data: [], total: 25 });
 
-      const result = await bookingService.getAllBookings({ ...params, role: "admin", page: 2, limit: 10 });
+      const result = await bookingService.getAllBookings({
+        ...params,
+        role: "admin",
+        page: 2,
+        limit: 10,
+      });
 
       expect(result.meta).toMatchObject({
         totalItems: 25,
@@ -475,7 +490,10 @@ describe("booking.service", () => {
         id: 1,
         guest: { userId: 999 },
       } as never);
-      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({ id: 1, guest: { id: 2 } } as never);
+      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({
+        id: 1,
+        guest: { id: 2 },
+      } as never);
 
       await expect(bookingService.getBookingById(1, USER_ID, "admin")).resolves.toEqual({
         id: 1,
@@ -510,7 +528,10 @@ describe("booking.service", () => {
     it("should confirm a pending booking with paidAt = now", async () => {
       vi.mocked(bookingRepository.findBookingWithOwnerById).mockResolvedValue(owner as never);
       vi.mocked(bookingRepository.confirmPendingBooking).mockResolvedValue(true);
-      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({ id: 1, status: "confirmed" } as never);
+      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({
+        id: 1,
+        status: "confirmed",
+      } as never);
 
       const result = await bookingService.payBooking(1, USER_ID);
 
@@ -668,7 +689,10 @@ describe("booking.service", () => {
     it("should allow confirmed → checkedIn when today >= startDate", async () => {
       vi.mocked(bookingRepository.findBookingWithOwnerById).mockResolvedValue(base as never);
       vi.mocked(bookingRepository.transitionBookingStatus).mockResolvedValue(true);
-      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({ id: 1, status: "checkedIn" } as never);
+      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({
+        id: 1,
+        status: "checkedIn",
+      } as never);
 
       const result = await bookingService.updateBookingStatus(1, { status: "checkedIn" });
 
@@ -684,7 +708,10 @@ describe("booking.service", () => {
         status: "checkedIn",
       } as never);
       vi.mocked(bookingRepository.transitionBookingStatus).mockResolvedValue(true);
-      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({ id: 1, status: "checkedOut" } as never);
+      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({
+        id: 1,
+        status: "checkedOut",
+      } as never);
 
       const result = await bookingService.updateBookingStatus(1, { status: "checkedOut" });
 
@@ -708,7 +735,10 @@ describe("booking.service", () => {
     it("should record cancelledAt and adminCancelled when cancelling", async () => {
       vi.mocked(bookingRepository.findBookingWithOwnerById).mockResolvedValue(base as never);
       vi.mocked(bookingRepository.transitionBookingStatus).mockResolvedValue(true);
-      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({ id: 1, status: "cancelled" } as never);
+      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({
+        id: 1,
+        status: "cancelled",
+      } as never);
 
       await bookingService.updateBookingStatus(1, { status: "cancelled" });
 
@@ -740,7 +770,10 @@ describe("booking.service", () => {
         startDate: TODAY,
       } as never);
       vi.mocked(bookingRepository.transitionBookingStatus).mockResolvedValue(true);
-      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({ id: 1, status: "checkedIn" } as never);
+      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({
+        id: 1,
+        status: "checkedIn",
+      } as never);
 
       await expect(
         bookingService.updateBookingStatus(1, { status: "checkedIn" }),
@@ -754,7 +787,10 @@ describe("booking.service", () => {
         startDate: addDaysUtc(TODAY, 5),
       } as never);
       vi.mocked(bookingRepository.transitionBookingStatus).mockResolvedValue(true);
-      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({ id: 1, status: "checkedOut" } as never);
+      vi.mocked(bookingRepository.findBookingById).mockResolvedValue({
+        id: 1,
+        status: "checkedOut",
+      } as never);
 
       await expect(
         bookingService.updateBookingStatus(1, { status: "checkedOut" }),

@@ -39,15 +39,15 @@ describe("date.util", () => {
 
   describe("nightsBetween", () => {
     it("should count nights between two UTC midnights", () => {
-      expect(nightsBetween(new Date("2025-06-20T00:00:00.000Z"), new Date("2025-06-22T00:00:00.000Z"))).toBe(
-        2,
-      );
+      expect(
+        nightsBetween(new Date("2025-06-20T00:00:00.000Z"), new Date("2025-06-22T00:00:00.000Z")),
+      ).toBe(2);
     });
 
     it("should return 1 for a single night", () => {
-      expect(nightsBetween(new Date("2025-06-20T00:00:00.000Z"), new Date("2025-06-21T00:00:00.000Z"))).toBe(
-        1,
-      );
+      expect(
+        nightsBetween(new Date("2025-06-20T00:00:00.000Z"), new Date("2025-06-21T00:00:00.000Z")),
+      ).toBe(1);
     });
 
     it("should be timezone/DST-safe because both dates are UTC midnights", () => {
@@ -59,9 +59,9 @@ describe("date.util", () => {
     });
 
     it("should be negative when end is before start", () => {
-      expect(nightsBetween(new Date("2025-06-22T00:00:00.000Z"), new Date("2025-06-20T00:00:00.000Z"))).toBe(
-        -2,
-      );
+      expect(
+        nightsBetween(new Date("2025-06-22T00:00:00.000Z"), new Date("2025-06-20T00:00:00.000Z")),
+      ).toBe(-2);
     });
   });
 

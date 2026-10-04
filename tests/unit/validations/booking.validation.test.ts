@@ -12,7 +12,9 @@ const DAY_MS = 86_400_000;
 
 /** استخراج پیام‌های خطا از نتیجه‌ی safeParse برای assert راحت‌تر. */
 function issues(result: { success: boolean; error?: { issues: unknown[] } }) {
-  return result.success ? [] : (result.error!.issues as Array<{ path: unknown[]; message: string }>);
+  return result.success
+    ? []
+    : (result.error!.issues as Array<{ path: unknown[]; message: string }>);
 }
 
 describe("booking.validation", () => {
@@ -206,12 +208,9 @@ describe("booking.validation", () => {
       },
     );
 
-    it.each(["pending", "confirmed"])(
-      "should reject the non-updatable status %s",
-      (status) => {
-        expect(updateBookingStatusSchema.body.safeParse({ status }).success).toBe(false);
-      },
-    );
+    it.each(["pending", "confirmed"])("should reject the non-updatable status %s", (status) => {
+      expect(updateBookingStatusSchema.body.safeParse({ status }).success).toBe(false);
+    });
 
     it("should reject a missing status", () => {
       expect(updateBookingStatusSchema.body.safeParse({}).success).toBe(false);
@@ -257,7 +256,9 @@ describe("booking.validation", () => {
       const result = parse({ from: "2026-01-01", to: to.toISOString().slice(0, 10) });
       expect(result.success).toBe(false);
       expect(
-        issues(result).some((i) => i.message.includes(String(BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS))),
+        issues(result).some((i) =>
+          i.message.includes(String(BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS)),
+        ),
       ).toBe(true);
     });
 

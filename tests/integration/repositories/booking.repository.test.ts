@@ -36,9 +36,27 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
   // ------------------------------------------------------------------
   describe("findAllBookings", () => {
     beforeEach(async () => {
-      await createBooking({ cabinId, guestId, status: "pending", startDate: utcDate("2030-06-01"), endDate: utcDate("2030-06-03") });
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-07-01"), endDate: utcDate("2030-07-03") });
-      await createBooking({ cabinId: otherCabinId, guestId: otherGuestId, status: "pending", startDate: utcDate("2030-08-01"), endDate: utcDate("2030-08-03") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "pending",
+        startDate: utcDate("2030-06-01"),
+        endDate: utcDate("2030-06-03"),
+      });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-07-01"),
+        endDate: utcDate("2030-07-03"),
+      });
+      await createBooking({
+        cabinId: otherCabinId,
+        guestId: otherGuestId,
+        status: "pending",
+        startDate: utcDate("2030-08-01"),
+        endDate: utcDate("2030-08-03"),
+      });
     });
 
     const all = () => bookingRepository.findAllBookings({ skip: 0, limit: 50, filters: {} });
@@ -178,7 +196,12 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
       });
 
       await expect(
-        bookingRepository.hasOverlappingBooking(cabinId, utcDate("2030-06-15"), utcDate("2030-06-18"), now),
+        bookingRepository.hasOverlappingBooking(
+          cabinId,
+          utcDate("2030-06-15"),
+          utcDate("2030-06-18"),
+          now,
+        ),
       ).resolves.toBe(true);
     });
 
@@ -193,7 +216,12 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
 
       // بازه‌ی جدید از روز خروج شروع می‌شود → نباید هم‌پوشانی باشد.
       await expect(
-        bookingRepository.hasOverlappingBooking(cabinId, utcDate("2030-06-15"), utcDate("2030-06-18"), now),
+        bookingRepository.hasOverlappingBooking(
+          cabinId,
+          utcDate("2030-06-15"),
+          utcDate("2030-06-18"),
+          now,
+        ),
       ).resolves.toBe(false);
     });
 
@@ -207,19 +235,46 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
       });
 
       await expect(
-        bookingRepository.hasOverlappingBooking(cabinId, utcDate("2030-06-15"), utcDate("2030-06-18"), now),
+        bookingRepository.hasOverlappingBooking(
+          cabinId,
+          utcDate("2030-06-15"),
+          utcDate("2030-06-18"),
+          now,
+        ),
       ).resolves.toBe(false);
     });
 
     it("should ignore cancelled and checkedOut bookings", async () => {
-      await createBooking({ cabinId, guestId, status: "cancelled", startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-20") });
-      await createBooking({ cabinId, guestId, status: "checkedOut", startDate: utcDate("2030-07-10"), endDate: utcDate("2030-07-20") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "cancelled",
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-20"),
+      });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "checkedOut",
+        startDate: utcDate("2030-07-10"),
+        endDate: utcDate("2030-07-20"),
+      });
 
       await expect(
-        bookingRepository.hasOverlappingBooking(cabinId, utcDate("2030-06-15"), utcDate("2030-06-18"), now),
+        bookingRepository.hasOverlappingBooking(
+          cabinId,
+          utcDate("2030-06-15"),
+          utcDate("2030-06-18"),
+          now,
+        ),
       ).resolves.toBe(false);
       await expect(
-        bookingRepository.hasOverlappingBooking(cabinId, utcDate("2030-07-15"), utcDate("2030-07-18"), now),
+        bookingRepository.hasOverlappingBooking(
+          cabinId,
+          utcDate("2030-07-15"),
+          utcDate("2030-07-18"),
+          now,
+        ),
       ).resolves.toBe(false);
     });
 
@@ -264,26 +319,59 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
     });
 
     it("should treat checkedIn as blocking", async () => {
-      await createBooking({ cabinId, guestId, status: "checkedIn", startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-20") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "checkedIn",
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-20"),
+      });
 
       await expect(
-        bookingRepository.hasOverlappingBooking(cabinId, utcDate("2030-06-15"), utcDate("2030-06-18"), now),
+        bookingRepository.hasOverlappingBooking(
+          cabinId,
+          utcDate("2030-06-15"),
+          utcDate("2030-06-18"),
+          now,
+        ),
       ).resolves.toBe(true);
     });
 
     it("should treat a range fully containing the new range as overlapping", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-01"), endDate: utcDate("2030-06-30") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-01"),
+        endDate: utcDate("2030-06-30"),
+      });
 
       await expect(
-        bookingRepository.hasOverlappingBooking(cabinId, utcDate("2030-06-10"), utcDate("2030-06-15"), now),
+        bookingRepository.hasOverlappingBooking(
+          cabinId,
+          utcDate("2030-06-10"),
+          utcDate("2030-06-15"),
+          now,
+        ),
       ).resolves.toBe(true);
     });
 
     it("should treat a range fully inside the new range as overlapping", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-12") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-12"),
+      });
 
       await expect(
-        bookingRepository.hasOverlappingBooking(cabinId, utcDate("2030-06-01"), utcDate("2030-06-30"), now),
+        bookingRepository.hasOverlappingBooking(
+          cabinId,
+          utcDate("2030-06-01"),
+          utcDate("2030-06-30"),
+          now,
+        ),
       ).resolves.toBe(true);
     });
   });
@@ -316,7 +404,13 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
     });
 
     it("should exclude bookings entirely before `from`", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-05-01"), endDate: utcDate("2030-05-10") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-05-01"),
+        endDate: utcDate("2030-05-10"),
+      });
 
       const ranges = await bookingRepository.findBookedDateRanges(
         cabinId,
@@ -327,7 +421,13 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
     });
 
     it("should exclude bookings entirely after `to`", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-08-01"), endDate: utcDate("2030-08-10") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-08-01"),
+        endDate: utcDate("2030-08-10"),
+      });
 
       const ranges = await bookingRepository.findBookedDateRanges(
         cabinId,
@@ -338,8 +438,20 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
     });
 
     it("should order by startDate asc", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-20"), endDate: utcDate("2030-06-22") });
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-05"), endDate: utcDate("2030-06-07") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-20"),
+        endDate: utcDate("2030-06-22"),
+      });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-05"),
+        endDate: utcDate("2030-06-07"),
+      });
 
       const ranges = await bookingRepository.findBookedDateRanges(
         cabinId,
@@ -377,10 +489,37 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
   describe("countPendingBookingsForGuest", () => {
     it("should count only non-expired pending bookings of the guest", async () => {
       const now = new Date("2030-06-01T00:00:00.000Z");
-      await createBooking({ cabinId, guestId, status: "pending", paymentDeadline: new Date("2030-06-10T00:00:00.000Z"), startDate: utcDate("2030-06-01"), endDate: utcDate("2030-06-03") });
-      await createBooking({ cabinId, guestId, status: "pending", paymentDeadline: new Date("2030-05-01T00:00:00.000Z"), startDate: utcDate("2030-06-05"), endDate: utcDate("2030-06-07") });
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-12") });
-      await createBooking({ cabinId, guestId: otherGuestId, status: "pending", paymentDeadline: new Date("2030-06-10T00:00:00.000Z"), startDate: utcDate("2030-06-15"), endDate: utcDate("2030-06-17") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "pending",
+        paymentDeadline: new Date("2030-06-10T00:00:00.000Z"),
+        startDate: utcDate("2030-06-01"),
+        endDate: utcDate("2030-06-03"),
+      });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "pending",
+        paymentDeadline: new Date("2030-05-01T00:00:00.000Z"),
+        startDate: utcDate("2030-06-05"),
+        endDate: utcDate("2030-06-07"),
+      });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-12"),
+      });
+      await createBooking({
+        cabinId,
+        guestId: otherGuestId,
+        status: "pending",
+        paymentDeadline: new Date("2030-06-10T00:00:00.000Z"),
+        startDate: utcDate("2030-06-15"),
+        endDate: utcDate("2030-06-17"),
+      });
 
       await expect(bookingRepository.countPendingBookingsForGuest(now, guestId)).resolves.toBe(1);
     });
@@ -542,11 +681,34 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
   // ------------------------------------------------------------------
   describe("expirePendingBookings", () => {
     it("should expire only pending bookings with deadline <= now", async () => {
-      await createBooking({ cabinId, guestId, status: "pending", paymentDeadline: new Date("2030-05-01T00:00:00.000Z"), startDate: utcDate("2030-06-01"), endDate: utcDate("2030-06-03") });
-      await createBooking({ cabinId, guestId, status: "pending", paymentDeadline: new Date("2030-07-01T00:00:00.000Z"), startDate: utcDate("2030-06-05"), endDate: utcDate("2030-06-07") });
-      await createBooking({ cabinId, guestId, status: "confirmed", paymentDeadline: new Date("2030-05-01T00:00:00.000Z"), startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-12") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "pending",
+        paymentDeadline: new Date("2030-05-01T00:00:00.000Z"),
+        startDate: utcDate("2030-06-01"),
+        endDate: utcDate("2030-06-03"),
+      });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "pending",
+        paymentDeadline: new Date("2030-07-01T00:00:00.000Z"),
+        startDate: utcDate("2030-06-05"),
+        endDate: utcDate("2030-06-07"),
+      });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        paymentDeadline: new Date("2030-05-01T00:00:00.000Z"),
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-12"),
+      });
 
-      const count = await bookingRepository.expirePendingBookings(new Date("2030-06-01T00:00:00.000Z"));
+      const count = await bookingRepository.expirePendingBookings(
+        new Date("2030-06-01T00:00:00.000Z"),
+      );
 
       expect(count).toBe(1);
       const expired = await prisma.booking.findMany({ where: { status: "cancelled" } });
@@ -564,8 +726,18 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
     });
 
     it("should scope expiration to a cabin when requested", async () => {
-      await createBooking({ cabinId, guestId, status: "pending", paymentDeadline: new Date("2030-05-01T00:00:00.000Z") });
-      await createBooking({ cabinId: otherCabinId, guestId, status: "pending", paymentDeadline: new Date("2030-05-01T00:00:00.000Z") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "pending",
+        paymentDeadline: new Date("2030-05-01T00:00:00.000Z"),
+      });
+      await createBooking({
+        cabinId: otherCabinId,
+        guestId,
+        status: "pending",
+        paymentDeadline: new Date("2030-05-01T00:00:00.000Z"),
+      });
 
       const count = await bookingRepository.expirePendingBookings(
         new Date("2030-06-01T00:00:00.000Z"),
@@ -584,12 +756,24 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
   // ------------------------------------------------------------------
   describe("database constraints", () => {
     it("should reject overlapping active bookings for the same cabin (exclusion constraint)", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-20") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-20"),
+      });
 
       let code: string | undefined;
       let originalCode: string | undefined;
       try {
-        await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-15"), endDate: utcDate("2030-06-25") });
+        await createBooking({
+          cabinId,
+          guestId,
+          status: "confirmed",
+          startDate: utcDate("2030-06-15"),
+          endDate: utcDate("2030-06-25"),
+        });
         throw new Error("expected the exclusion constraint to reject the insert");
       } catch (error: unknown) {
         code = (error as { code?: string }).code;
@@ -609,34 +793,82 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
     });
 
     it("should allow adjacent active bookings for the same cabin", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-15") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-15"),
+      });
 
       await expect(
-        createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-15"), endDate: utcDate("2030-06-20") }),
+        createBooking({
+          cabinId,
+          guestId,
+          status: "confirmed",
+          startDate: utcDate("2030-06-15"),
+          endDate: utcDate("2030-06-20"),
+        }),
       ).resolves.toBeDefined();
     });
 
     it("should allow an overlapping cancelled booking", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-20") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-20"),
+      });
 
       await expect(
-        createBooking({ cabinId, guestId, status: "cancelled", startDate: utcDate("2030-06-12"), endDate: utcDate("2030-06-18") }),
+        createBooking({
+          cabinId,
+          guestId,
+          status: "cancelled",
+          startDate: utcDate("2030-06-12"),
+          endDate: utcDate("2030-06-18"),
+        }),
       ).resolves.toBeDefined();
     });
 
     it("should allow an overlapping checkedOut booking", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-20") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-20"),
+      });
 
       await expect(
-        createBooking({ cabinId, guestId, status: "checkedOut", startDate: utcDate("2030-06-12"), endDate: utcDate("2030-06-18") }),
+        createBooking({
+          cabinId,
+          guestId,
+          status: "checkedOut",
+          startDate: utcDate("2030-06-12"),
+          endDate: utcDate("2030-06-18"),
+        }),
       ).resolves.toBeDefined();
     });
 
     it("should allow overlapping bookings on different cabins", async () => {
-      await createBooking({ cabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-10"), endDate: utcDate("2030-06-20") });
+      await createBooking({
+        cabinId,
+        guestId,
+        status: "confirmed",
+        startDate: utcDate("2030-06-10"),
+        endDate: utcDate("2030-06-20"),
+      });
 
       await expect(
-        createBooking({ cabinId: otherCabinId, guestId, status: "confirmed", startDate: utcDate("2030-06-12"), endDate: utcDate("2030-06-18") }),
+        createBooking({
+          cabinId: otherCabinId,
+          guestId,
+          status: "confirmed",
+          startDate: utcDate("2030-06-12"),
+          endDate: utcDate("2030-06-18"),
+        }),
       ).resolves.toBeDefined();
     });
 
@@ -644,7 +876,12 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
       let code: string | undefined;
       let originalCode: string | undefined;
       try {
-        await createBooking({ cabinId, guestId, startDate: utcDate("2030-06-20"), endDate: utcDate("2030-06-20") });
+        await createBooking({
+          cabinId,
+          guestId,
+          startDate: utcDate("2030-06-20"),
+          endDate: utcDate("2030-06-20"),
+        });
         throw new Error("expected the CHECK constraint to reject the insert");
       } catch (error: unknown) {
         code = (error as { code?: string }).code;
@@ -652,7 +889,9 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.repository (integration)",
           error as { meta?: { driverAdapterError?: { cause?: { originalCode?: string } } } }
         ).meta?.driverAdapterError?.cause?.originalCode;
         // eslint-disable-next-line no-console
-        console.info(`[constraint] CHECK violation → Prisma code=${code}, raw PG SQLSTATE=${originalCode}`);
+        console.info(
+          `[constraint] CHECK violation → Prisma code=${code}, raw PG SQLSTATE=${originalCode}`,
+        );
       }
 
       // مستندسازی واقعیت: Prisma 7 با driver adapter هر دو نقض constraint

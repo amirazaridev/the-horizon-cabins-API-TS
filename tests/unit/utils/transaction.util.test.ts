@@ -46,10 +46,7 @@ describe("transaction.util / withSerializableRetry", () => {
   });
 
   it("should retry once on P2034 and succeed on the next attempt", async () => {
-    const fn = vi
-      .fn()
-      .mockRejectedValueOnce(prismaError("P2034"))
-      .mockResolvedValue("recovered");
+    const fn = vi.fn().mockRejectedValueOnce(prismaError("P2034")).mockResolvedValue("recovered");
 
     const { result } = withHandler(() => withSerializableRetry(fn));
     await vi.advanceTimersByTimeAsync(200);
@@ -117,10 +114,7 @@ describe("transaction.util / withSerializableRetry", () => {
   });
 
   it("should wait between 50 and 100 ms (inclusive) for backoff", async () => {
-    const fn = vi
-      .fn()
-      .mockRejectedValueOnce(prismaError("P2034"))
-      .mockResolvedValue("done");
+    const fn = vi.fn().mockRejectedValueOnce(prismaError("P2034")).mockResolvedValue("done");
 
     const { result } = withHandler(() => withSerializableRetry(fn));
 
