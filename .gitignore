@@ -69,6 +69,12 @@ web_modules/
 .env
 .env.*
 !.env.example
+# .env.test intentionally committed: it holds no real secrets and is required
+# for integration tests to run.
+!.env.test
+
+# Test artifacts
+tests/setup/.db-available
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
