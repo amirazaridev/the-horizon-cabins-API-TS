@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  calculateCabinPrice,
-  calculateTotalPrice,
-} from "../../../src/utils/booking-price.util.js";
+import { calculateCabinPrice, calculateTotalPrice } from "../../../src/utils/booking-price.util.js";
 
 describe("booking-price.util", () => {
   describe("calculateCabinPrice", () => {

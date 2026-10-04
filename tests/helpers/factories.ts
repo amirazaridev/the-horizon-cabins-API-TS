@@ -1,5 +1,9 @@
 import { prisma } from "../../src/config/database.js";
-import type { UserRole, BookingStatus, CancellationReason } from "../../src/generated/prisma/enums.js";
+import type {
+  UserRole,
+  BookingStatus,
+  CancellationReason,
+} from "../../src/generated/prisma/enums.js";
 
 /**
  * factoryها برای ساخت داده‌ی تست.
