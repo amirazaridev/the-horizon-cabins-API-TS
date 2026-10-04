@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { todayInTimezone, nightsBetween, addDaysUtc } from "../../../src/utils/date.util.js";
+import { todayInTimezone, nightsBetween, addDaysUtc, isoWeekday } from "../../../src/utils/date.util.js";
 
 describe("date.util", () => {
   describe("todayInTimezone", () => {
@@ -110,6 +110,31 @@ describe("date.util", () => {
       // ممکن بود روز جابه‌جا شود. با setUTCDate باید دقیقاً ۳۶۵ روز جلو برود.
       const start = new Date("2026-01-01T23:30:00.000Z");
       expect(addDaysUtc(start, 365).toISOString()).toBe("2027-01-01T23:30:00.000Z");
+    });
+  });
+
+  describe("isoWeekday", () => {
+    it("maps Monday..Sunday to 1..7", () => {
+      // 2026-01-05 دوشنبه است.
+      const expected: [string, number][] = [
+        ["2026-01-05", 1], // Mon
+        ["2026-01-06", 2], // Tue
+        ["2026-01-07", 3], // Wed
+        ["2026-01-08", 4], // Thu
+        ["2026-01-09", 5], // Fri
+        ["2026-01-10", 6], // Sat
+        ["2026-01-11", 7], // Sun
+      ];
+
+      for (const [ymd, iso] of expected) {
+        expect(isoWeekday(new Date(`${ymd}T00:00:00.000Z`))).toBe(iso);
+      }
+    });
+
+    it("is independent of the server timezone", () => {
+      // یک لحظه‌ی اواخر شب UTC که در تهران روز بعد است؛ چون تاریخ همیشه
+      // نیمه‌شب UTC است، روز هفته باید از خودِ مقدار UTC محاسبه شود.
+      expect(isoWeekday(new Date("2026-01-07T00:00:00.000Z"))).toBe(3);
     });
   });
 });

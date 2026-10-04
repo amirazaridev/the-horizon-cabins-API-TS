@@ -25,3 +25,15 @@ export function addDaysUtc(date: Date, days: number): Date {
   result.setUTCDate(result.getUTCDate() + days);
   return result;
 }
+
+/**
+ * روز هفته‌ی ISO (دوشنبه=۱ … یکشنبه=۷) از یک تاریخ نیمه‌شب UTC.
+ *
+ * ⚠️ عمداً از `getUTCDay` استفاده می‌کنیم، نه `getDay`؛ چون تاریخ‌ها همیشه
+ * نیمه‌شب UTC ذخیره می‌شوند و تبدیل به زمان محلی سرور می‌تواند روز را جابه‌جا کند.
+ * `getUTCDay()` یکشنبه را ۰ برمی‌گرداند؛ در ISO یکشنبه ۷ است.
+ */
+export function isoWeekday(date: Date): number {
+  const day = date.getUTCDay();
+  return day === 0 ? 7 : day;
+}
