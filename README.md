@@ -28,6 +28,22 @@ npm run prisma:generate
 npm run dev
 ```
 
+### Dynamic Pricing
+Nightly prices are derived by a pure, deterministic engine
+(`src/utils/pricing.engine.ts`) from per-cabin `PriceRule`s (date-range or
+weekday, discount or surcharge). The engine is the single source of truth:
+rule stacking is limited (≤2 of each type per night, ≤50% summed per type) and
+discounts/surcharges combine multiplicatively, in integer Toman only.
+
+Materialized results live in `cabin_daily_prices` and are refreshed on demand
+(`POST /api/v1/price-calendar/rebuild`, owner-only) and nightly by a background
+job. Bookings freeze a per-night snapshot in `booking_nights` so a stay's total
+never changes after creation. The booking horizon is capped at 120 days.
+
+Run the daily calendar job and rebuild after deploying migrations/seed:
+`npx prisma migrate deploy && npx prisma db seed` (the seed rebuilds all
+calendars).
+
 ---
 
 ## Testing

@@ -77,7 +77,6 @@ enum PriceRuleAuditAction {
 }
 
 /// هدفی که یک کد تایید برای آن صادر شده است.
-/// افزودن مقدار جدید بدون تغییر اسکیمای جدول ممکن است (فقط enum).
 enum OtpPurpose {
   signup // تایید ایمیل هنگام ساخت حساب
   passwordReset // بازیابی رمز عبور
@@ -276,25 +275,14 @@ model Setting {
 }
 
 /// کد تایید یک‌بارمصرف (OTP).
-///
-/// ⚠️ اصول امنیتی که این مدل رعایت می‌کند:
-///  - کد هرگز به‌صورت متن خام ذخیره نمی‌شود؛ فقط `codeHash` (bcrypt) نگه داشته
-///    می‌شود تا اگر پایگاه‌داده لو رفت، کدها قابل استفاده نباشند.
-///  - کد **یک‌بارمصرف** است؛ بعد از تایید موفق `status = consumed` می‌شود.
-///  - `expiresAt` منبع حقیقت انقضاست (پلاس TTL قابل تنظیم، نه هاردکد).
-///  - `attempts` سقف تلاش اشتباه را می‌شمارد تا حدس زدن کد (brute-force) متوقف شود.
-///  - برای محدودیت نرخ ارسال، از ردیف‌های همین جدول بر اساس `email + createdAt`
-///    شمارش می‌گیریم؛ نیازی به جدول جداگانه نیست.
-///  - `verificationTokenHash`: پس از تایید موفق، یک توکن یک‌بارمصرف کوتاه‌عمر
-///    صادر می‌شود که در `signup` الزامی است. تنها هش آن ذخیره می‌شود.
 model VerificationCode {
   id Int @id @default(autoincrement())
 
-  /// ایمیل مقصد (نرمال‌شده: lowercase/trim).
+  /// ایمیل مقصد
   email   String     @db.VarChar(254)
   purpose OtpPurpose
 
-  /// هش bcrypt کد ۶ رقمی — کد خام هرگز ذخیره نمی‌شود.
+  /// هش bcrypt- کد خام هرگز ذخیره نمی‌شود.
   codeHash String @map("code_hash") @db.VarChar(255)
 
   status OtpStatus @default(pending)
@@ -316,7 +304,6 @@ model VerificationCode {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  /// برای «آخرین کد فعال این ایمیل» و کوئری‌های محدودیت نرخ.
   @@index([email, purpose, status])
   /// برای پاک‌سازی دوره‌ای ردیف‌های منقضی.
   @@index([expiresAt])
@@ -331,9 +318,6 @@ model VerificationCode {
 ///
 /// - `dateRange`: بازه‌ی تاریخ شامل هر دو سر (startDate..endDate).
 /// - `weekday`: روزهای هفته‌ی ISO (۱=دوشنبه … ۷=یکشنبه).
-///
-/// ⚠️ سقف‌های قابل‌تنظیم (تعداد و مجموع درصد) عمداً در CHECK دیتابیس نیستند،
-/// چون بعداً به جدول `Setting` منتقل می‌شوند؛ فقط شکل داده در CHECK تضمین می‌شود.
 model PriceRule {
   id Int @id @default(autoincrement())
 
@@ -363,8 +347,6 @@ model PriceRule {
   @@map("price_rules")
 }
 
-/// تاریخچه‌ی تغییرات قاعده — حتی بعد از hard-delete قاعده باقی می‌ماند.
-/// `ruleId` عمداً FK ندارد (قاعده ممکن است حذف شده باشد).
 model PriceRuleAudit {
   id        Int                  @id @default(autoincrement())
   ruleId    Int                  @map("rule_id")
@@ -382,7 +364,6 @@ model PriceRuleAudit {
 }
 
 /// read-model تقویم قیمت برای لیست/فیلتر/مرتب‌سازی کابین‌ها.
-/// فقط با فراخوانی موتور قیمت‌گذاری از کد اپلیکیشن پر می‌شود (هرگز با SQL مستقل).
 model CabinDailyPrice {
   cabinId Int   @map("cabin_id")
   cabin   Cabin @relation(fields: [cabinId], references: [id], onDelete: Cascade, onUpdate: Cascade)

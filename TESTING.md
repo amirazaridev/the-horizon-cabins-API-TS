@@ -425,7 +425,9 @@ DATABASE_URL="postgresql://postgres:1234@localhost:5432/Horizon_DB_test?schema=p
 | factory | توضیح |
 |---------|-------|
 | `createUser({ role, email, active, withGuest, fullName })` | کاربر می‌سازد؛ برای نقش `guest` به‌طور پیش‌فرض پروفایل Guest هم می‌سازد |
-| `createCabin({ name, maxCapacity, regularPrice, discount, cityId })` | Region→City→Cabin را خودکار می‌سازد |
+| `createCabin({ name, maxCapacity, regularPrice, cityId })` | Region→City→Cabin را خودکار می‌سازد |
+| `createPriceRule({ cabinId, type, kind, percent, startDate, endDate, weekdays, actorId })` | قاعده‌ی قیمت‌گذاری برای تست‌های pricing |
+| `createCabinDailyPrice({ cabinId, date, basePrice, discountPercent, surchargePercent, finalPrice })` | درج مستقیم ردیف تقویم قیمت |
 | `createRegion(name?)` / `createCity(regionId?)` | ساخت زنجیره‌ی مکانی |
 | `createBooking({ cabinId, guestId, startDate, endDate, status, paymentDeadline, ... })` | ساخت مستقیم رزرو در DB (برای تست‌های repository/route) |
 | `utcDate("YYYY-MM-DD")` | ساخت `Date` نیمه‌شب UTC |
@@ -550,20 +552,21 @@ export const BOOKINGS_PATH = `${API_BASE}/bookings`;
 > **جزئیات فنی:** تست‌ها برای پرهیز از unhandled rejection، یک helper `withHandler()` دارند که
 > handler را **بلافاصله** به promise می‌چسباند و بعد `vi.advanceTimersByTimeAsync` صدا زده می‌شود.
 
-### ۷.۳ `tests/unit/utils/booking-price.util.test.ts` — ۱۰ تست
+### ۷.۳ `tests/unit/utils/booking-price.util.test.ts` — ۶ تست
 
-**هدف:** محاسبه‌ی قیمت در `src/utils/booking-price.util.ts` (`calculateCabinPrice`, `calculateTotalPrice`).
+**هدف:** helperهای پول در `src/utils/booking-price.util.ts` (`sumNightPrices`, `fitsInt32`).
 
-**دلیل انتخاب:** قیمت حساس‌ترین عدد پروژه است؛ گردکردن (floor) و کران‌ها (تخفیف ۰/۱۰۰/بالای ۱۰۰)
-باید قطعی باشند و نوع خروجی باید `number` باشد (نه BigInt که در JSON خطا می‌دهد).
+**دلیل انتخاب:** جمع قیمت شب‌های یک اقامت باید از سرریز `Int32` (ستون `totalPrice`) محافظت شود؛
+در صورت سرریز باید `null` برگردد تا سرویس خطای واضح بدهد، نه عدد نادرست.
 
 | سناریو | ورودی → خروجی |
 |--------|----------------|
-| تخفیف ۱۰٪ | `100000, 10` → `90000` |
-| floor اعشاری | `99999, 10` → `89999` |
-| تخفیف ۱۰۰٪ / بالای ۱۰۰ | → `0` (هرگز منفی) |
-| ضرب قیمت در شب | `90000, 2` → `180000` |
-| نوع خروجی | `number` (سازگار با ستون Int) |
+| جمع قیمت شب‌ها | `[1e6, 1e6, 1e6]` → `3000000` |
+| لیست خالی | `[]` → `0` |
+| سرریز Int32 | `[MAX_INT32, 1]` → `null` |
+| کرانه‌ی دقیقاً MAX | `[MAX_INT32]` → `MAX_INT32` |
+| `fitsInt32` بازه‌ی معتبر | `0`, `MAX_INT32` → `true` |
+| `fitsInt32` نامعتبر | `MAX_INT32+1`, `-1`, `1.5` → `false` |
 
 ### ۷.۴ `tests/unit/utils/booking.util.test.ts` — ۳۱ تست
 

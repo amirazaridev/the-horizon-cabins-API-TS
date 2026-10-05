@@ -103,8 +103,7 @@ Request → Middleware (auth/validate/pagination) → Route → Controller → S
 | id | Int (PK) | Auto-increment |
 | name | String | Unique |
 | maxCapacity | Int | |
-| regularPrice | Int | |
-| discount | Int | Default: `0` |
+| regularPrice | Int | Base nightly price (Toman). Drives the dynamic pricing engine |
 | description | String | |
 | amenities | String[] | PostgreSQL array |
 | bedrooms | Int | |
@@ -137,18 +136,60 @@ Request → Middleware (auth/validate/pagination) → Route → Controller → S
 | Field | Type | Notes |
 |-------|------|-------|
 | id | Int (PK) | Auto-increment |
-| startDate | DateTime | |
-| endDate | DateTime | |
+| startDate | DateTime | `@db.Date` (UTC midnight) |
+| endDate | DateTime | `@db.Date` (UTC midnight) |
 | numNights | Int | |
 | numGuests | Int | |
-| cabinPrice | Int | |
+| cabinPrice | Int | **Subtotal** = SUM of nightly final prices (no extras) |
 | extrasPrice | Int | Default: `0` |
-| totalPrice | BigInt | |
-| status | BookingStatus | Default: `confirmed` |
-| isPaid | Boolean | Default: `false` |
+| totalPrice | Int | Frozen snapshot of the quoted total |
+| status | BookingStatus | Default: `pending` |
+| cancelledAt / cancellationReason | DateTime? / CancellationReason? | |
 | observations | Text? | Nullable |
 | cabinId | Int (FK → Cabin) | Restrict delete |
 | guestId | Int (FK → Guest) | Restrict delete |
+| nights | BookingNight[] | Immutable per-night price snapshot |
+| createdAt / updatedAt | DateTime | |
+
+#### PriceRule (Dynamic Pricing)
+| Field | Type | Notes |
+|-------|------|-------|
+| id | Int (PK) | Auto-increment |
+| cabinId | Int (FK → Cabin) | Cascade delete |
+| type | PriceRuleType | `discount` \| `surcharge` |
+| kind | PriceRuleKind | `date_range` \| `weekday` |
+| percent | Int | 1..50 (CHECK enforced) |
+| startDate / endDate | DateTime? | Required for `date_range` |
+| weekdays | Int[] | ISO 1..7, required for `weekday` |
+| label | String? | |
+| isActive | Boolean | Default: `true` |
+| createdById / updatedById | Int (FK → User) | |
+
+#### CabinDailyPrice (Materialized read model)
+| Field | Type | Notes |
+|-------|------|-------|
+| cabinId + date | Composite PK | |
+| basePrice | Int | Cabin `regularPrice` at build time |
+| discountPercent / surchargePercent | Int | Applied rule totals |
+| finalPrice | Int | Result of the pricing engine |
+| updatedAt | DateTime | |
+
+#### BookingNight (Immutable snapshot)
+| Field | Type | Notes |
+|-------|------|-------|
+| bookingId + date | Composite PK | |
+| basePrice | Int | |
+| discountPercent / surchargePercent | Int | |
+| finalPrice | Int | |
+
+#### PriceRuleAudit
+| Field | Type | Notes |
+|-------|------|-------|
+| id | Int (PK) | Auto-increment |
+| cabinId / ruleId | Int | History survives rule deletion |
+| action | PriceRuleAuditAction | created/updated/activated/deactivated/deleted |
+| snapshot | Json | Rule state at the time of the action |
+| actorId | Int (FK → User)? | |
 
 #### Setting
 | Field | Type | Notes |
@@ -197,23 +238,50 @@ Request → Middleware (auth/validate/pagination) → Route → Controller → S
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/v1/cabins` | Public | List cabins (paginated, filterable by city/guests/bedrooms/amenities/price/category) |
-| POST | `/api/v1/cabins` | Public | Create cabin (with image upload to Supabase) |
+| GET | `/api/v1/cabins` | Public | List cabins (paginated, filterable by city/guests/bedrooms/amenities/price/category/dates) |
+| POST | `/api/v1/cabins` | admin\|owner | Create cabin (with image upload to Supabase) |
 | GET | `/api/v1/cabins/cities` | Public | List all cities |
 | GET | `/api/v1/cabins/amenities` | Public | List all amenities |
 | GET | `/api/v1/cabins/:id` | Public | Get cabin by ID |
-| PATCH | `/api/v1/cabins/:id` | Public | Update cabin |
-| DELETE | `/api/v1/cabins/:id` | Public | Delete cabin |
+| PATCH | `/api/v1/cabins/:id` | admin\|owner | Update cabin |
+| DELETE | `/api/v1/cabins/:id` | admin\|owner | Delete cabin |
 | GET | `/api/v1/cabins/:id/categories` | Public | Get cabin's categories |
-| POST | `/api/v1/cabins/:id/categories` | Public | Set cabin's categories (replace) |
-| DELETE | `/api/v1/cabins/:id/categories/:categoryId` | Public | Remove category from cabin |
+| POST | `/api/v1/cabins/:id/categories` | admin\|owner | Set cabin's categories (replace) |
+| DELETE | `/api/v1/cabins/:id/categories/:categoryId` | admin\|owner | Remove category from cabin |
+| GET | `/api/v1/cabins/:cabinId/price-quote` | Public | Quote a stay price for a date range |
+| GET | `/api/v1/cabins/:cabinId/price-calendar` | Public | Cabin daily price calendar |
 
 **Features:**
 - Image upload to Supabase Storage (JPEG/PNG/WebP/AVIF, max 5MB, max 10 files)
 - Dynamic filtering with query parameters
 - Pagination with metadata
-- Discount validation
+- Regular price range validation (`MIN_REGULAR_PRICE`..`MAX_REGULAR_PRICE`)
 - Category assignment via transaction
+
+### 5.4b Dynamic Pricing Module (Complete)
+
+A pure pricing engine (`src/utils/pricing.engine.ts`) is the single source of
+truth: for each night it collects the active rules, applies stacking limits and
+combines them multiplicatively
+(`final = floor(base * (100 + S) * (100 - D) / 10000)`), never using floats.
+Results are materialized into `cabin_daily_prices` (a 120-night rolling window)
+by the calendar builder and refreshed nightly by a job.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/v1/cabins/:cabinId/price-rules` | admin\|owner | List a cabin's price rules |
+| POST | `/api/v1/cabins/:cabinId/price-rules` | admin\|owner | Create a price rule |
+| PATCH | `/api/v1/price-rules/:id` | admin\|owner | Update a rule (optimistic) |
+| DELETE | `/api/v1/price-rules/:id` | admin\|owner | Soft-delete a rule |
+| POST | `/api/v1/price-rules/bulk` | admin\|owner | Bulk create/update rules |
+| GET | `/api/v1/cabins/:cabinId/price-calendar` | Public | Daily price calendar |
+| GET | `/api/v1/cabins/:cabinId/price-quote` | Public | Quote a stay for a date range |
+| POST | `/api/v1/price-calendar/rebuild` | owner | Rebuild calendars on demand |
+
+**Key rules:** discounts ≤ 50% summed, surcharges ≤ 50% summed, at most 2 rules
+of each type per night; nightly price bounded by `MAX_NIGHTLY_PRICE`, regular
+price by `MAX_REGULAR_PRICE`; booking horizon capped at
+`MAX_ADVANCE_BOOKING_DAYS` (120).
 
 ### 5.5 Middleware Stack
 
@@ -231,19 +299,18 @@ Request → Middleware (auth/validate/pagination) → Route → Controller → S
 
 ## 6. Unimplemented / Incomplete Sections
 
-### 6.1 Booking System (Schema Only — No Application Layer)
+### 6.1 Booking System (Implemented)
 
-The `Booking` model exists in the Prisma schema with full fields (dates, pricing, status, payment), but there are **no** routes, controllers, services, or repositories for bookings. This is the largest missing feature.
+The Booking module is fully implemented: routes, controller, service, repository
+and validations all exist, backed by serializable transactions, an exclusion
+constraint for overlapping stays, a 30-minute pending expiry job, and the
+dynamic pricing engine. Availability, nightly pricing and status transitions
+(pending → confirmed → checkedIn → checkedOut / cancelled) are all in place.
 
-**Needed:**
-- `src/routes/booking.route.ts`
-- `src/controllers/booking.controller.ts`
-- `src/services/booking.service.ts`
-- `src/repositories/booking.repository.ts`
-- `src/validations/booking.validation.ts`
-- Availability checking logic (prevent overlapping bookings)
-- Price calculation (nights × cabin price + extras)
-- Booking status workflow (confirmed → checkedIn → checkedOut)
+> Note: the only out-of-scope pitfall found is that `startBookingExpirationJob()`
+> is exported but **not** started in `src/server.ts` (only `startOtpCleanupJob`
+> and `startPriceCalendarJob` are). This was left untouched by the dynamic
+> pricing work and is reported in `PRICING_IMPLEMENTATION_REPORT.md`.
 - Payment integration
 
 ### 6.2 Guest Module (Partially Implemented)
@@ -270,11 +337,14 @@ The `Booking` model exists in the Prisma schema with full fields (dates, pricing
 
 The `City` model exists and is used for cabin filtering, but there are no standalone city management endpoints (create/update/delete cities). Cities are only seeded.
 
-### 6.5 Tests (None)
+### 6.5 Tests (Vitest)
 
-- No test framework configured (no Jest, Vitest, Mocha)
-- No test files exist
-- No CI/CD pipeline
+Vitest runs in two projects: `unit` (`vitest.unit.config.ts`, no DB, fast) and
+`integration` (`vitest.integration.config.ts`, real Postgres on `Horizon_DB_test`).
+Run them with `npm run test:unit` and `npm run test:integration`. See `TESTING.md`
+for the suite breakdown.
+
+No CI/CD pipeline is configured.
 
 ### 6.6 Docker / Deployment (None)
 

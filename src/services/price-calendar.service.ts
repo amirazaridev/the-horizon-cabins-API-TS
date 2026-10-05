@@ -23,7 +23,7 @@ export interface DateRange {
   to: Date;
 }
 
-/** پنجره‌ی تقویم قیمت: [today, today + horizon - 1] در Asia/Tehran. */
+//* پنجره‌ی تقویم قیمت: از امروز (به وقت تهران) تا آخرین روز افق.
 export function getCalendarWindow(now: Date = new Date()): DateRange {
   const today = todayInTimezone(TIMEZONE, now);
   return {
@@ -32,17 +32,16 @@ export function getCalendarWindow(now: Date = new Date()): DateRange {
   };
 }
 
-/** اشتراک دو بازه (شامل)، یا null اگر تلاقی نداشته باشند. */
+//* اشتراک دو بازه (شامل هر دو سر)؛ اگر تلاقی نداشته باشند null.
 function intersect(a: DateRange, b: DateRange): DateRange | null {
   const from = new Date(Math.max(a.from.getTime(), b.from.getTime()));
   const to = new Date(Math.min(a.to.getTime(), b.to.getTime()));
   return to.getTime() >= from.getTime() ? { from, to } : null;
 }
 
-/**
- * بازه‌ی متأثر از یک تغییر قاعده = اجتماع بازه‌های قاعده‌ی قبلی و جدید
- * (intersect با پنجره). قاعده‌ی weekday کل پنجره را متأثر می‌کند.
- * اگر تلاقی خالی باشد (مثلاً قاعده‌ای کاملاً بیرون از پنجره)، null برمی‌گردد.
+/*
+ * بازه‌ای از پنجره که با تغییر یک قاعده باید بازمحاسبه شود
+ * (از روی قاعده‌ی قبلی و جدید). اگر چیزی متأثر نشود null.
  */
 export function resolveAffectedCalendarRange(
   before: PricingRule | null,
@@ -72,9 +71,9 @@ export function resolveAffectedCalendarRange(
   };
 }
 
-/**
- * بازسازی تقویم قیمت یک کابین برای بازه‌ی مشخص (پیش‌فرض: کل پنجره).
- * ردیف‌های بازه حذف و با موتور قیمت‌گذاری دوباره ساخته می‌شوند.
+/*
+ * بازسازی تقویم یک کابین برای بازه‌ی مشخص (پیش‌فرض: کل پنجره).
+ * ردیف‌های قدیمی حذف و با موتور قیمت‌گذاری دوباره ساخته می‌شوند.
  */
 export async function rebuildCabinPriceCalendar(
   db: Db,
@@ -120,7 +119,7 @@ export async function rebuildCabinPriceCalendar(
   return calendarRepository.insertCabinDailyPrices(rows, db);
 }
 
-/** بازسازی تقویم همه‌ی کابین‌ها (کل پنجره). برای rebuild دستی و seed. */
+//* بازسازی تقویم همه‌ی کابین‌ها (کل پنجره). برای rebuild دستی و seed. 
 export async function rebuildAllCabinPriceCalendars(
   now: Date = new Date(),
   db: Db = prisma,
@@ -133,9 +132,9 @@ export async function rebuildAllCabinPriceCalendars(
   return total;
 }
 
-/**
+/*
  * نگه‌داری روزانه: ردیف‌های گذشته حذف، و ردیف‌های ناقص پنجره برای هر کابین پر می‌شوند.
- * idempotent است؛ اجرای دوباره تغییری ایجاد نمی‌کند.
+ * اجرای دوباره تغییری ایجاد نمی‌کند.
  */
 export async function runDailyPriceCalendarMaintenance(
   now: Date = new Date(),
@@ -167,9 +166,9 @@ export async function runDailyPriceCalendarMaintenance(
   return { deleted, rebuiltCabins: incomplete.length };
 }
 
-// ==================================================================
-// Read / manual rebuild
-// ==================================================================
+//? ==================================================================
+//? Read / manual rebuild
+//? ==================================================================
 
 export interface PriceCalendarDay {
   date: Date;
@@ -186,7 +185,7 @@ export interface PriceCalendarResult {
   days: PriceCalendarDay[];
 }
 
-/**
+/*
  * خواندن تقویم قیمت یک کابین از `CabinDailyPrice`.
  * بازه باید داخل پنجره باشد. اگر ردیف‌ها ناقص باشند (مثلاً قبل از اجرای جاب)،
  * همان بازه بازسازی می‌شود تا پاسخ همیشه کامل باشد (self-healing).
@@ -243,7 +242,7 @@ export async function getCabinPriceCalendar(
   };
 }
 
-/** rebuild دستی (owner): یک کابین مشخص یا همه‌ی کابین‌ها. */
+//* rebuild دستی (owner): یک کابین مشخص یا همه‌ی کابین‌ها. */
 export async function rebuildCalendar(
   cabinId?: number,
   now: Date = new Date(),

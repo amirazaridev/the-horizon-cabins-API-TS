@@ -1,52 +1,35 @@
 import { describe, it, expect } from "vitest";
-import { calculateCabinPrice, calculateTotalPrice } from "../../../src/utils/booking-price.util.js";
+import { fitsInt32, sumNightPrices, MAX_INT32 } from "../../../src/utils/booking-price.util.js";
 
 describe("booking-price.util", () => {
-  describe("calculateCabinPrice", () => {
-    it("should return the full price when the discount is 0", () => {
-      expect(calculateCabinPrice(100_000, 0)).toBe(100_000);
+  describe("sumNightPrices", () => {
+    it("should sum nightly prices", () => {
+      expect(sumNightPrices([1_000_000, 1_000_000, 1_000_000])).toBe(3_000_000);
     });
 
-    it("should apply a 10% discount", () => {
-      expect(calculateCabinPrice(100_000, 10)).toBe(90_000);
+    it("should return 0 for an empty list", () => {
+      expect(sumNightPrices([])).toBe(0);
     });
 
-    it("should floor fractional results", () => {
-      // 99999 * 0.9 = 89999.1 → floor = 89999
-      expect(calculateCabinPrice(99_999, 10)).toBe(89_999);
+    it("should return null when the sum overflows Int32", () => {
+      expect(sumNightPrices([MAX_INT32, 1])).toBeNull();
     });
 
-    it("should floor a half-cent result downward", () => {
-      // 1000 - 10 = 990 دقیق؛ برای اعشاری: 333 با 10% → 299.7 → 299
-      expect(calculateCabinPrice(333, 10)).toBe(299);
-    });
-
-    it("should return 0 for a 100% discount", () => {
-      expect(calculateCabinPrice(100_000, 100)).toBe(0);
-    });
-
-    it("should never return a negative value for a discount above 100", () => {
-      expect(calculateCabinPrice(100_000, 150)).toBe(0);
-    });
-
-    it("should handle a zero regular price", () => {
-      expect(calculateCabinPrice(0, 10)).toBe(0);
+    it("should allow a sum exactly at Int32 max", () => {
+      expect(sumNightPrices([MAX_INT32])).toBe(MAX_INT32);
     });
   });
 
-  describe("calculateTotalPrice", () => {
-    it("should multiply the nightly price by the number of nights", () => {
-      expect(calculateTotalPrice(90_000, 2)).toBe(180_000);
+  describe("fitsInt32", () => {
+    it("should accept values within range", () => {
+      expect(fitsInt32(0)).toBe(true);
+      expect(fitsInt32(MAX_INT32)).toBe(true);
     });
 
-    it("should return 0 for zero nights", () => {
-      expect(calculateTotalPrice(90_000, 0)).toBe(0);
-    });
-
-    it("should return a number (not BigInt) consistent with the Prisma Int column", () => {
-      const result = calculateTotalPrice(100_000, 1);
-      expect(typeof result).toBe("number");
-      expect(result).toBe(100_000);
+    it("should reject overflow, negatives and non-integers", () => {
+      expect(fitsInt32(MAX_INT32 + 1)).toBe(false);
+      expect(fitsInt32(-1)).toBe(false);
+      expect(fitsInt32(1.5)).toBe(false);
     });
   });
 });

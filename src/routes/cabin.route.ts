@@ -14,6 +14,9 @@ import { BOOKING_ADMIN_ROLES } from "../constants/booking.constants.js";
 
 const router = Router();
 
+//? نوشتن‌های کابین فقط برای admin|owner (هم‌راستا با قواعد قیمت‌گذاری).
+const requireCabinAdmin = [protect, restrictTo(...BOOKING_ADMIN_ROLES)];
+
 router
   .route("/")
   .get(
@@ -21,7 +24,7 @@ router
     paginationMiddleware,
     cabinController.getAll,
   )
-  .post(cabinController.createCabin);
+  .post(...requireCabinAdmin, cabinController.createCabin);
 router.route("/amenities").get(cabinController.getAllAmenities);
 
 //? تقویم قیمت یک کابین (عمومی).
@@ -57,11 +60,16 @@ router
 router
   .route("/:id/categories")
   .get(cabinController.getCabinCategories)
-  .post(validate(categoryValidation.assignCategoriesSchema), cabinController.setCabinCategories);
+  .post(
+    ...requireCabinAdmin,
+    validate(categoryValidation.assignCategoriesSchema),
+    cabinController.setCabinCategories,
+  );
 
 router
   .route("/:id/categories/:categoryId")
   .delete(
+    ...requireCabinAdmin,
     validate(categoryValidation.cabinCategoryIdParamsSchema),
     cabinController.removeCabinCategory,
   );
@@ -69,7 +77,15 @@ router
 router
   .route("/:id")
   .get(validate(cabinValidation.getCabinSchema), cabinController.getCabin)
-  .delete(validate(cabinValidation.deleteCabinSchema), cabinController.deleteCabin)
-  .patch(validate(cabinValidation.updateCabinSchema), cabinController.updateCabin);
+  .delete(
+    ...requireCabinAdmin,
+    validate(cabinValidation.deleteCabinSchema),
+    cabinController.deleteCabin,
+  )
+  .patch(
+    ...requireCabinAdmin,
+    validate(cabinValidation.updateCabinSchema),
+    cabinController.updateCabin,
+  );
 
 export default router;

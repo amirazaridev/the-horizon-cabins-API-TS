@@ -14,12 +14,7 @@ import { TIMEZONE } from "../constants/booking.constants.js";
 
 type Db = typeof prisma | PrismaTransactionClient;
 
-/**
- * مقادیر enum به‌صورت literal دیتابیس (`booking_status`).
- * توجه: مقادیر Prisma ("checkedIn") با مقادیر DB ("checked-in") فرق دارند،
- * و Prisma.join این‌ها را به‌صورت string literal کوتیشن‌دار تزریق می‌کند که
- * با enum پستگرس نمی‌خواند. پس باید مقادیر DB را خام تزریق کنیم.
- */
+
 const OCCUPYING_STATUS_SQL = Prisma.raw(
   OCCUPYING_STATUSES.map((status) => `'${BOOKING_STATUS_DB[status]}'`).join(", "),
 );
@@ -290,7 +285,7 @@ async function queryStartingPrice(params: {
     SELECT c."id" AS id, s."sortPrice", NULL::int AS nights, COUNT(*) OVER() AS "totalCount"
     FROM "cabins" AS c
     LEFT JOIN starting AS s ON s.id = c."id"
-    WHERE TRUE
+    WHERE c."id" = ANY(${candidateIds})
       ${priceFilter}
     ${orderByPrice}
     LIMIT ${limit} OFFSET ${skip}

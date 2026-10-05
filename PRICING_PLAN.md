@@ -71,3 +71,24 @@ src/utils/booking-price.util.test.ts(3,3): error TS2305:
 - **P9** Persian final report
 
 Each phase is committed locally with a clear message.
+
+---
+
+## 7. Final status
+
+All phases P1–P9 are complete on `feature/dynamic-pricing`. Nothing has been
+pushed. Final verification (P8):
+
+| Check | Command | Result |
+|---|---|---|
+| Typecheck | `npx tsc --noEmit` | **0 errors** |
+| Lint | `npx eslint .` | **0 errors, 2 warnings** (pre-existing `helmet`/`cors`) |
+| Unit tests | `npx vitest run --config vitest.unit.config.ts` | **227 passed / 227** (10 files) |
+| Integration tests | `npx vitest run --config vitest.integration.config.ts` | **175 passed / 175** (9 files) |
+| Fresh DB (migrations) | `prisma migrate deploy` on a scratch DB | **7/7 applied cleanly** |
+| Fresh DB (seed) | `prisma db seed` | **10 cabins, 3 rules, 1200 calendar rows** |
+
+Baseline at P0 was 167 unit / 101 integration. The pre-existing typecheck error
+in `src/utils/booking-price.util.test.ts` was resolved (that stale file was
+removed and the canonical test rewritten). The full Persian report is in
+`PRICING_IMPLEMENTATION_REPORT.md`.
