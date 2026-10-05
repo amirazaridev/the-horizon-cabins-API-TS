@@ -174,6 +174,59 @@ export function calculateStayPrice(
   return { nights, totalPrice };
 }
 
+/** یک شبِ محاسبه‌شده برای پاسخ قیمت (شامل تاریخ). */
+export interface QuotedNight {
+  date: Date;
+  basePrice: number;
+  discountPercent: number;
+  surchargePercent: number;
+  finalPrice: number;
+  appliedRules: AppliedRule[];
+  limitsExceeded: boolean;
+}
+
+export interface QuotedStay {
+  nights: QuotedNight[];
+  totalPrice: number;
+}
+
+/**
+ * قیمت یک بازه‌ی اقامت `[startDate, endDate)` را از روی
+ * قواعدِ از قبل انتخاب‌شده محاسبه می‌کند. همان منطق `calculateStayPrice`
+ * است اما شب‌ها را به‌شکل موردنیاز API بازمی‌گرداند.
+ */
+export function quoteStayPrice(
+  basePrice: number,
+  rules: PricingRule[],
+  startDate: Date,
+  endDate: Date,
+  limits: PricingLimits = PRICING_LIMITS,
+): QuotedStay {
+  const numNights = nightsBetween(startDate, endDate);
+  const nights: QuotedNight[] = [];
+  let totalPrice = 0;
+
+  for (let i = 0; i < numNights; i += 1) {
+    const date = addDaysUtc(startDate, i);
+    const covering = rulesForNight(rules, date);
+    const clamped = applyDefensiveLimits(covering, limits);
+    const breakdown = calculateNightPrice(basePrice, clamped.rules, clamped.exceeded);
+
+    nights.push({
+      date,
+      basePrice: breakdown.basePrice,
+      discountPercent: breakdown.discountPercent,
+      surchargePercent: breakdown.surchargePercent,
+      finalPrice: breakdown.finalPrice,
+      appliedRules: breakdown.appliedRules,
+      limitsExceeded: breakdown.limitsExceeded,
+    });
+    totalPrice += breakdown.finalPrice;
+  }
+
+  return { nights, totalPrice };
+}
+
 interface DayStat {
   index: number;
   count: number;

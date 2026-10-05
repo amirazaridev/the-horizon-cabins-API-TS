@@ -35,6 +35,15 @@ export async function getCabinCategories(req: Request, res: Response): Promise<v
   sendSuccess(res, { data: { categories } });
 }
 
+/** قیمت‌گذاری عمومی یک بازه‌ی اقامت (بدون ایجاد رزرو). */
+export async function getPriceQuote(req: Request, res: Response): Promise<void> {
+  const cabinId = Number(req.params.cabinId);
+  const { startDate, endDate } = req.parseQuery as { startDate: Date; endDate: Date };
+
+  const quote = await cabinService.getPriceQuote(cabinId, { startDate, endDate });
+  sendSuccess(res, { data: { quote } });
+}
+
 export async function createCabin(req: Request, res: Response): Promise<void> {
   const cabin = await cabinService.createCabin(
     req.body,

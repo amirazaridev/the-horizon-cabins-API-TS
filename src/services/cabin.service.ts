@@ -48,6 +48,9 @@ export async function getCabinById(id: number): Promise<Cabin> {
   return cabin;
 }
 
+/** قیمت‌گذاری یک بازه — منطق در booking.service است (موتور مشترک). */
+export { getPriceQuote } from "./booking.service.js";
+
 export async function getCabinCategories(cabinId: number): Promise<Category[]> {
   const cabin = await cabinRepository.findCabinById(cabinId);
   if (!cabin) throw new AppError("Cabin not found!", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);

@@ -1,4 +1,4 @@
-import { addMinutes, isAfter, isBefore } from "date-fns";
+import { addMinutes, isBefore } from "date-fns";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Booking, UserRole } from "../generated/prisma/client.js";
 import { AppError } from "../utils/AppError.js";
@@ -7,12 +7,16 @@ import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { getBookingSettings, TIMEZONE } from "../constants/booking.constants.js";
 import { isValidStatusTransition, hasFullBookingAccess } from "../utils/booking.util.js";
 import { simulatePaymentGateway } from "../utils/payment.util.js";
-import { calculateCabinPrice, calculateTotalPrice } from "../utils/booking-price.util.js";
+import { sumNightPrices } from "../utils/booking-price.util.js";
+import { validateStayRange } from "../utils/booking-date.util.js";
+import { quoteStayPrice } from "../utils/pricing.engine.js";
 import { withSerializableRetry } from "../utils/transaction.util.js";
 import * as bookingRepository from "../repositories/booking.repository.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as guestRepository from "../repositories/guest.repository.js";
+import * as priceRuleRepository from "../repositories/price-rule.repository.js";
 import { prisma } from "../config/database.js";
+import { getPricingLimits } from "../constants/pricing.constants.js";
 import type { z } from "zod";
 import type {
   createBookingSchema,
@@ -21,7 +25,8 @@ import type {
 import type { PaginatedResult, PaginationParams } from "../types/pagination.types.js";
 import { getPaginationMeta } from "../utils/pagination.utils.js";
 import type { BookedDatesQuery, BookingFilters } from "../types/booking.types.js";
-import { addDaysUtc, nightsBetween, todayInTimezone } from "../utils/date.util.js";
+import type { PricingRule } from "../types/pricing.types.js";
+import { addDaysUtc, todayInTimezone } from "../utils/date.util.js";
 
 type CreateBookingInput = z.infer<typeof createBookingSchema.body>;
 type UpdateStatusInput = z.infer<typeof updateBookingStatusSchema.body>;
@@ -64,41 +69,11 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
 
   const settings = getBookingSettings();
 
-  const today = todayInTimezone(TIMEZONE, now);
-  if (isBefore(input.startDate, today)) {
-    throw new AppError(
-      "Start date cannot be in the past",
-      HTTP_STATUS.BAD_REQUEST,
-      ErrorCode.BOOKING_INVALID_DATE_RANGE,
-    );
-  }
-
-  //* حداکثر فاصله‌ی startDate از امروز
-  if (isAfter(input.startDate, addDaysUtc(today, settings.maxAdvanceBookingDays))) {
-    throw new AppError(
-      `Start date cannot be more than ${settings.maxAdvanceBookingDays} days in the future`,
-      HTTP_STATUS.BAD_REQUEST,
-      ErrorCode.BOOKING_INVALID_DATE_RANGE,
-    );
-  }
-
-  if (!isAfter(input.endDate, input.startDate)) {
-    throw new AppError(
-      "End date must be after start date",
-      HTTP_STATUS.BAD_REQUEST,
-      ErrorCode.BOOKING_INVALID_DATE_RANGE,
-    );
-  }
-
-  const numNights = nightsBetween(input.startDate, input.endDate);
-
-  if (numNights < settings.minBookingLengthNights || numNights > settings.maxBookingLengthNights) {
-    throw new AppError(
-      `Booking must be between ${settings.minBookingLengthNights} and ${settings.maxBookingLengthNights} nights`,
-      HTTP_STATUS.BAD_REQUEST,
-      ErrorCode.BOOKING_INVALID_DATE_RANGE,
-    );
-  }
+  //* قواعد تاریخ رزرو — از تابع مشترک با endpoint قیمت‌گذاری استفاده می‌شود.
+  const { numNights } = validateStayRange(
+    { startDate: input.startDate, endDate: input.endDate },
+    now,
+  );
 
   const cabin = await cabinRepository.findCabinById(input.cabinId);
   if (!cabin) {
@@ -114,14 +89,11 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
     );
   }
 
-  //* Cabin.discount حذف شده است؛ تخفیف‌ها فقط به‌صورت PriceRule وجود دارند.
-  //* محاسبه‌ی مبتنی بر موتور قیمت‌گذاری در فاز بعدی (P5) جایگزین می‌شود.
-  const cabinPrice = calculateCabinPrice(cabin.regularPrice, 0);
-  const totalPrice = calculateTotalPrice(cabinPrice, numNights);
+  const limits = await getPricingLimits();
   const paymentDeadline = addMinutes(now, settings.paymentDeadlineMinutes);
 
   //* تراکنش ممکن است چند بار اجرا شود؛ پس هیچ side effect بیرون از آن داخل callback نگذار.
-  return withSerializableRetry(() =>
+  const created = await withSerializableRetry(() =>
     prisma.$transaction(
       async (tx) => {
         await bookingRepository.expirePendingBookings(now, { cabinId: input.cabinId }, tx);
@@ -156,13 +128,55 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
           );
         }
 
-        return bookingRepository.createBooking(
+        //* قیمت همیشه از موتور قیمت‌گذاری محاسبه می‌شود (هرگز از CabinDailyPrice خوانده نمی‌شود).
+        const activeRules = (await priceRuleRepository.findActiveRulesForCabin(
+          input.cabinId,
+          tx,
+        )) as unknown as PricingRule[];
+
+        const quote = quoteStayPrice(
+          cabin.regularPrice,
+          activeRules,
+          input.startDate,
+          input.endDate,
+          limits,
+        );
+
+        const totalPrice = sumNightPrices(quote.nights.map((night) => night.finalPrice));
+        if (totalPrice === null) {
+          throw new AppError(
+            "The computed booking total exceeds the supported range",
+            HTTP_STATUS.BAD_REQUEST,
+            ErrorCode.BOOKING_TOTAL_OVERFLOW,
+          );
+        }
+
+        //* شامل بررسی اختیاری expectedTotalPrice (تغییر قیمت بین دو درخواست).
+        if (
+          input.expectedTotalPrice !== undefined &&
+          input.expectedTotalPrice !== totalPrice
+        ) {
+          throw new AppError(
+            "The price of this stay has changed",
+            HTTP_STATUS.CONFLICT,
+            ErrorCode.PRICE_CHANGED,
+            true,
+            {
+              expectedTotalPrice: input.expectedTotalPrice,
+              totalPrice,
+              cabinPrice: totalPrice,
+            },
+          );
+        }
+
+        const booking = await bookingRepository.createBooking(
           {
             startDate: input.startDate,
             endDate: input.endDate,
             numNights,
             numGuests: input.numGuests,
-            cabinPrice,
+            //* cabinPrice اکنون جمع کل اقامت است (subtotal) — نه قیمت یک شب.
+            cabinPrice: totalPrice,
             totalPrice,
             status: "pending",
             paymentDeadline,
@@ -172,10 +186,90 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
           },
           tx,
         );
+
+        await bookingRepository.createBookingNights(
+          booking.id,
+          quote.nights.map((night) => ({
+            date: night.date,
+            basePrice: night.basePrice,
+            discountPercent: night.discountPercent,
+            surchargePercent: night.surchargePercent,
+            finalPrice: night.finalPrice,
+            appliedRules: night.appliedRules as unknown as Prisma.InputJsonValue,
+          })),
+          tx,
+        );
+
+        return booking;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     ),
   );
+
+  //* خواندنِ پاسخ بعد از commit انجام می‌شود تا تراکنش کوتاه بماند و احتمال
+  //* write conflict (که به P2034 منجر می‌شود) بالا نرود.
+  return (await bookingRepository.findBookingById(created.id)) ?? created;
+}
+
+/**
+ * قیمت‌گذاری یک بازه‌ی اقامت (عمومی) — بدون ایجاد رزرو.
+ * از همان موتور و همان اعتبارسنجی تاریخِ ساخت رزرو استفاده می‌کند.
+ */
+export async function getPriceQuote(
+  cabinId: number,
+  range: { startDate: Date; endDate: Date },
+): Promise<{
+  cabinId: number;
+  startDate: Date;
+  endDate: Date;
+  nights: {
+    date: Date;
+    basePrice: number;
+    discountPercent: number;
+    surchargePercent: number;
+    finalPrice: number;
+    appliedRules: unknown;
+  }[];
+  totalPrice: number;
+  available: boolean;
+}> {
+  const now = new Date();
+  const { startDate, endDate } = validateStayRange(range, now);
+
+  const cabin = await cabinRepository.findCabinById(cabinId);
+  if (!cabin) {
+    throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
+  }
+
+  const limits = await getPricingLimits();
+  const activeRules = (await priceRuleRepository.findActiveRulesForCabin(
+    cabinId,
+  )) as unknown as PricingRule[];
+
+  const quote = quoteStayPrice(cabin.regularPrice, activeRules, startDate, endDate, limits);
+
+  const hasOverlap = await bookingRepository.hasOverlappingBooking(
+    cabinId,
+    startDate,
+    endDate,
+    now,
+  );
+
+  return {
+    cabinId,
+    startDate,
+    endDate,
+    nights: quote.nights.map((night) => ({
+      date: night.date,
+      basePrice: night.basePrice,
+      discountPercent: night.discountPercent,
+      surchargePercent: night.surchargePercent,
+      finalPrice: night.finalPrice,
+      appliedRules: night.appliedRules,
+    })),
+    totalPrice: quote.totalPrice,
+    available: !hasOverlap,
+  };
 }
 
 export async function getAllBookings(

@@ -8,6 +8,7 @@ import * as cabinValidation from "../validations/cabin.validation.js";
 import * as categoryValidation from "../validations/category.validation.js";
 import * as priceRuleValidation from "../validations/price-rule.validation.js";
 import * as priceCalendarValidation from "../validations/price-calendar.validation.js";
+import * as bookingValidation from "../validations/booking.validation.js";
 import { paginationMiddleware } from "../middlewares/pagination.middleware.js";
 import { BOOKING_ADMIN_ROLES } from "../constants/booking.constants.js";
 
@@ -28,6 +29,13 @@ router.get(
   "/:cabinId/price-calendar",
   validate(priceCalendarValidation.cabinPriceCalendarSchema),
   priceCalendarController.getCabinCalendar,
+);
+
+//? قیمت‌گذاری یک بازه‌ی اقامت (عمومی).
+router.get(
+  "/:cabinId/price-quote",
+  validate(bookingValidation.priceQuoteSchema),
+  cabinController.getPriceQuote,
 );
 
 //? قواعد قیمت‌گذاری یک کابین — فقط admin|owner.

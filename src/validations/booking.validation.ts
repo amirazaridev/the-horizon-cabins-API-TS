@@ -13,6 +13,14 @@ const createBookingBodySchema = z.object({
   endDate: dateOnlySchema,
   numGuests: z.preprocess(safeNumber, z.number().int().min(1)),
   observations: z.string().trim().max(2000).optional(),
+  //* اختیاری: اگر ارسال شود و با قیمت محاسبه‌شده‌ی سرور تفاوت داشته باشد → 409 PRICE_CHANGED.
+  expectedTotalPrice: z.preprocess(safeNumber, z.number().int().nonnegative().optional()),
+});
+
+/** `GET /cabins/:cabinId/price-quote?startDate=&endDate=` */
+const priceQuoteQuerySchema = z.object({
+  startDate: dateOnlySchema,
+  endDate: dateOnlySchema,
 });
 
 const listBookingsQuerySchema = z.object({
@@ -58,6 +66,7 @@ const bookedDatesQuerySchema = z
   );
 
 export const createBookingSchema = { body: createBookingBodySchema };
+export const priceQuoteSchema = { params: cabinIdParamsSchema, query: priceQuoteQuerySchema };
 export const listBookingsQueryValidation = { query: listBookingWithPagQuerySchema };
 export const getBookingSchema = { params: idParamsSchema };
 export const payBookingSchema = { params: idParamsSchema };
