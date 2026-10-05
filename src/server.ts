@@ -3,6 +3,7 @@ import { checkDatabaseConnection, disconnectDatabase } from "./config/database.j
 import env from "./config/env.js";
 import logger from "./config/logger.js";
 import { startOtpCleanupJob } from "./jobs/otp-cleanup.job.js";
+import { startPriceCalendarJob } from "./jobs/price-calendar.job.js";
 /* eslint-disable n/no-process-exit */
 async function startServer(): Promise<void> {
   const app = createApp();
@@ -14,6 +15,7 @@ async function startServer(): Promise<void> {
 
   // جاب‌های دوره‌ای — بعد از اطمینان از اتصال دیتابیس.
   startOtpCleanupJob();
+  startPriceCalendarJob();
 
   const server = app.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} [${env.NODE_ENV}]`);
