@@ -9,7 +9,7 @@ import { getPaginationMeta } from "../utils/pagination.utils.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import type { PaginatedResult } from "../types/pagination.types.js";
-import { CabinFilters, CabinWithCity } from "../types/cabin.types.js";
+import { CabinFilters, CabinWithPricing } from "../types/cabin.types.js";
 
 type CreateCabinInput = z.infer<typeof createCabinSchema.body>;
 type UpdateCabinInput = z.infer<typeof updateCabinSchema.body>;
@@ -24,7 +24,7 @@ type GetAllCabinsParams = {
 
 export async function getAllCabins(
   params: GetAllCabinsParams = {},
-): Promise<PaginatedResult<CabinWithCity>> {
+): Promise<PaginatedResult<CabinWithPricing>> {
   const { skip = 0, limit = 10, page = 1, categorySlug, filters } = params;
   const { data, total } = await cabinRepository.findAllCabins({
     skip,

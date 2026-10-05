@@ -28,6 +28,19 @@ export const VALID_STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = 
 //* وضعیت‌هایی که یک بازه را «اشغال‌شده» نشان می‌دهند
 export const OCCUPYING_STATUSES: BookingStatus[] = ["confirmed", "checkedIn"];
 
+/**
+ * نگاشت مقدار enum پریزما به literal واقعی دیتابیس (ستون booking_status).
+ * پریزما مقادیر camelCase می‌فرستد، اما DB مقادیر @map شده را می‌شناسد
+ * (مثلاً "checkedIn" → "checked-in"). برای تزریق خام در SQL لازم است.
+ */
+export const BOOKING_STATUS_DB: Record<BookingStatus, string> = {
+  pending: "pending",
+  confirmed: "confirmed",
+  cancelled: "cancelled",
+  checkedIn: "checked-in",
+  checkedOut: "checked-out",
+};
+
 interface BookingSettings {
   paymentDeadlineMinutes: number;
   maxPendingBookingsPerGuest: number;
