@@ -15,14 +15,16 @@ export interface MaintenanceRunResult {
   ran: boolean;
   deleted: number;
   rebuiltCabins: number;
+  failedCabins: number;
 }
 
-/**
+/*
  * اجرای نگه‌داری تقویم قیمت با محافظت در برابر اجرای هم‌زمان.
  *
  * از `pg_try_advisory_xact_lock` داخل یک تراکنش استفاده می‌کنیم (قفل در پایان
  * تراکنش خودکار آزاد می‌شود؛ با قفل session-level و connection pool، unlock
- * ممکن بود روی اتصال دیگری اجرا شود).
+ * ممکن بود روی اتصال دیگری اجرا شود). کل جاب داخل همان تراکنش اجرا می‌شود و
+ * در finally نیازی به unlock نیست؛ چون xact-lock خودش آزاد می‌شود.
  */
 export async function runPriceCalendarMaintenanceGuarded(
   now: Date = new Date(),
@@ -34,7 +36,7 @@ export async function runPriceCalendarMaintenanceGuarded(
 
     if (!rows[0]?.locked) {
       logger.warn("Price calendar maintenance skipped: another run is already in progress");
-      return { ran: false, deleted: 0, rebuiltCabins: 0 };
+      return { ran: false, deleted: 0, rebuiltCabins: 0, failedCabins: 0 };
     }
 
     const result = await runDailyPriceCalendarMaintenance(now, tx);

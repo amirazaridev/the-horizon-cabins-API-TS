@@ -61,19 +61,31 @@ export async function insertCabinDailyPrices(
   return inserted;
 }
 
+export interface IncompleteCabin {
+  cabinId: number;
+  /** بیشترین تاریخی که ردیف دارد (null اگر هیچ ردیفی نباشد). */
+  maxDate: Date | null;
+  /** تعداد ردیف‌های موجود در بازه. */
+  count: number;
+}
+
 /**
- * شناسه‌ی کابین‌هایی که تقویمشان در بازه‌ی [from, to] کامل نیست
- * (کمتر از `expectedDays` ردیف دارند).
+ * کابین‌هایی که تقویمشان در بازه‌ی [from, to] کامل نیست
+ * (کمتر از `expectedDays` ردیف دارند)، به‌همراه `max(date)` و `count` هر کدام
+ * تا فراخوان بتواند فقط فاصله‌ی انتهایی را بازسازی کند و کل پنجره را از نو نسازد.
  */
 export async function findCabinIdsWithIncompleteCalendar(
   from: Date,
   to: Date,
-  expectedDays: number,
   db: Db = prisma,
-): Promise<number[]> {
-  const rows = await db.$queryRaw<{ id: number }[]>(
+): Promise<IncompleteCabin[]> {
+  const expectedDays = Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1;
+  const rows = await db.$queryRaw<{ id: number; maxDate: Date | null; count: bigint }[]>(
     Prisma.sql`
-      SELECT c."id"
+      SELECT
+        c."id" AS "id",
+        MAX(p."date") AS "maxDate",
+        COUNT(p."date") AS "count"
       FROM "cabins" AS c
       LEFT JOIN "cabin_daily_prices" AS p
         ON p."cabin_id" = c."id" AND p."date" BETWEEN ${from} AND ${to}
@@ -82,5 +94,9 @@ export async function findCabinIdsWithIncompleteCalendar(
       ORDER BY c."id" ASC
     `,
   );
-  return rows.map((row) => row.id);
+  return rows.map((row) => ({
+    cabinId: row.id,
+    maxDate: row.maxDate,
+    count: Number(row.count),
+  }));
 }

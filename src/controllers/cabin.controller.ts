@@ -1,13 +1,14 @@
 import type { Request, Response } from "express";
 import * as cabinService from "../services/cabin.service.js";
+import * as pricingService from "../services/pricing.service.js";
 import { sendSuccess } from "../utils/apiResponse.js";
+import { getIntParam, getQuery } from "../utils/request.util.js";
 import type { CabinFilters } from "../types/cabin.types.js";
 
 export async function getAll(req: Request, res: Response): Promise<void> {
   const { skip, limit, page } = req.pagination!;
-  const { parseQuery } = req;
-  const { category: categorySlug } = parseQuery as unknown as { category?: string };
-  const filters = parseQuery as unknown as CabinFilters;
+  const { category: categorySlug } = getQuery<{ category?: string }>(req);
+  const filters = getQuery<CabinFilters>(req);
   const { data: cabins, meta } = await cabinService.getAllCabins({
     skip,
     limit,
@@ -17,29 +18,30 @@ export async function getAll(req: Request, res: Response): Promise<void> {
   });
   sendSuccess(res, { data: { cabins, meta } });
 }
+
 export async function getAllAmenities(req: Request, res: Response) {
   const amenities = await cabinService.getAllAmenities();
   sendSuccess(res, { data: { amenities } });
 }
 
 export async function getCabin(req: Request, res: Response): Promise<void> {
-  const id = Number(req.params.id);
+  const id = getIntParam(req, "id");
   const cabin = await cabinService.getCabinById(id);
   sendSuccess(res, { data: { cabin } });
 }
 
 export async function getCabinCategories(req: Request, res: Response): Promise<void> {
-  const id = Number(req.params.id);
+  const id = getIntParam(req, "id");
   const categories = await cabinService.getCabinCategories(id);
   sendSuccess(res, { data: { categories } });
 }
 
 /** قیمت‌گذاری عمومی یک بازه‌ی اقامت (بدون ایجاد رزرو). */
 export async function getPriceQuote(req: Request, res: Response): Promise<void> {
-  const cabinId = Number(req.params.cabinId);
-  const { startDate, endDate } = req.parseQuery as { startDate: Date; endDate: Date };
+  const cabinId = getIntParam(req, "cabinId");
+  const { startDate, endDate } = getQuery<{ startDate: Date; endDate: Date }>(req);
 
-  const quote = await cabinService.getPriceQuote(cabinId, { startDate, endDate });
+  const quote = await pricingService.getPriceQuote(cabinId, { startDate, endDate });
   sendSuccess(res, { data: { quote } });
 }
 
@@ -48,11 +50,11 @@ export async function createCabin(req: Request, res: Response): Promise<void> {
     req.body,
     (req.files as Express.Multer.File[] | undefined) ?? [],
   );
-  res.status(201).json({ status: "success", data: { cabin } });
+  sendSuccess(res, { statusCode: 201, data: { cabin } });
 }
 
 export async function updateCabin(req: Request, res: Response): Promise<void> {
-  const id = Number(req.params.id);
+  const id = getIntParam(req, "id");
   const cabin = await cabinService.updateCabin(
     id,
     req.body,
@@ -62,20 +64,20 @@ export async function updateCabin(req: Request, res: Response): Promise<void> {
 }
 
 export async function deleteCabin(req: Request, res: Response): Promise<void> {
-  const id = Number(req.params.id);
+  const id = getIntParam(req, "id");
   await cabinService.deleteCabin(id);
   sendSuccess(res, { statusCode: 204 });
 }
 
 export async function setCabinCategories(req: Request, res: Response): Promise<void> {
-  const id = Number(req.params.id);
+  const id = getIntParam(req, "id");
   await cabinService.setCabinCategories(id, req.body.categoryIds);
   sendSuccess(res, { statusCode: 204 });
 }
 
 export async function removeCabinCategory(req: Request, res: Response): Promise<void> {
-  const id = Number(req.params.id);
-  const categoryId = Number(req.params.categoryId);
+  const id = getIntParam(req, "id");
+  const categoryId = getIntParam(req, "categoryId");
   await cabinService.removeCabinCategory(id, categoryId);
   sendSuccess(res, { statusCode: 204 });
 }

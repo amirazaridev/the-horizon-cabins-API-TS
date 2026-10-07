@@ -26,14 +26,12 @@ async function syncSequences(tables: string[]): Promise<void> {
 async function main() {
   logger.info("🌱 Seeding started...");
 
-  // Regions must exist before cities, because every city references a region.
   await seedRegions();
   await seedCities();
   await seedCategories();
   await seedCabins();
   await seedCabinCategories();
 
-  // Sample pricing rules + their daily price calendars (built by the engine).
   const ruleCount = await seedPriceRules();
   const calendarRows = await rebuildAllCabinPriceCalendars();
 

@@ -344,6 +344,7 @@ model PriceRule {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([cabinId, isActive])
+  @@index([isActive, endDate])
   @@map("price_rules")
 }
 

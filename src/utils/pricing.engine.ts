@@ -1,5 +1,7 @@
-import logger from "../config/logger.js";
-import { PRICING_LIMITS } from "../constants/pricing.constants.js";
+import { AppError } from "./AppError.js";
+import { ErrorCode } from "../constants/errorCodes.js";
+import { HTTP_STATUS } from "../constants/httpStatus.js";
+import { MAX_INT32 } from "./booking-price.util.js";
 import { addDaysUtc, isoWeekday, nightsBetween } from "./date.util.js";
 import type {
   AppliedRule,
@@ -8,15 +10,14 @@ import type {
   PricingRule,
   RuleLimitViolation,
   RuleType,
-  StayNightPrice,
-  StayPriceResult,
 } from "../types/pricing.types.js";
 
 /**
  * موتور قیمت‌گذاری — **تنها منبع حقیقت** برای محاسبه‌ی قیمت شب.
  *
- * این ماژول pure است (بدون دسترسی به دیتابیس) و هیچ‌جا فرمول را دوباره در SQL
- * پیاده نمی‌کنیم؛ تقویم قیمت هم با همین موتور پر می‌شود تا «drift» فرمول رخ ندهد.
+ * این ماژول pure است (بدون دیتابیس و بدون logger، بدون side effect) و هیچ‌جا
+ * فرمول را دوباره در SQL پیاده نمی‌کنیم؛ تقویم قیمت هم با همین موتور پر می‌شود
+ * تا «drift» فرمول رخ ندهد.
  */
 
 /** اسنپ‌شات یک قاعده برای ذخیره در `BookingNight.appliedRules`. */
@@ -117,12 +118,15 @@ function clampGroup(rules: PricingRule[], maxCount: number, maxPercent: number):
 /**
  * حالت دفاعی خواندن: اگر داده‌ی ذخیره‌شده سقف‌ها را نقض کرده باشد، موتور
  * نباید throw کند (مسیر رزرو حساس است). قواعد با بیشترین درصد تا سقفِ تعداد
- * نگه داشته می‌شوند، مجموع درصدها سقف‌زده می‌شود، خطا لاگ می‌شود و شب با
- * `limitsExceeded: true` علامت می‌خورد. این یک safety net است، نه یک قابلیت.
+ * نگه داشته می‌شوند، مجموع درصدها سقف‌زده می‌شود و شب با `limitsExceeded: true`
+ * علامت می‌خورد.
+ *
+ * ⚠️ این تابع pure است و چیزی لاگ نمی‌کند؛ مسئولیت لاگ با فراخوان است
+ * (یک بار به‌ازای هر quote / هر rebuild کابین، نه هر شب).
  */
 export function applyDefensiveLimits(
   rules: PricingRule[],
-  limits: PricingLimits = PRICING_LIMITS,
+  limits: PricingLimits,
 ): ClampResult {
   const discounts = clampGroup(
     rules.filter((rule) => rule.type === "discount"),
@@ -135,43 +139,36 @@ export function applyDefensiveLimits(
     limits.maxTotalSurchargePercent,
   );
 
-  const exceeded = discounts.exceeded || surcharges.exceeded;
-  if (exceeded) {
-    logger.error("Pricing limits exceeded by stored rules; applying defensive clamp", {
-      totalRules: rules.length,
-      keptRules: discounts.rules.length + surcharges.rules.length,
-    });
-  }
-
-  return { rules: [...discounts.rules, ...surcharges.rules], exceeded };
+  return {
+    rules: [...discounts.rules, ...surcharges.rules],
+    exceeded: discounts.exceeded || surcharges.exceeded,
+  };
 }
 
 /**
- * محاسبه‌ی قیمت کل اقامت برای بازه‌ی `[startDate, endDate)`.
- * شب‌ها `startDate .. endDate-1` هستند.
+ * **خط لوله‌ی واحد هر شب**: انتخاب قواعد پوشاننده → اعمال سقفِ دفاعی → محاسبه‌ی
+ * قیمت. تقویم، quote و snapshot رزرو همگی از همین یک تابع رد می‌شوند تا هیچ‌وقت
+ * دو پیاده‌سازی موازی نداشته باشیم.
  */
-export function calculateStayPrice(
+export function priceNight(
   basePrice: number,
   rules: PricingRule[],
-  startDate: Date,
-  endDate: Date,
-  limits: PricingLimits = PRICING_LIMITS,
-): StayPriceResult {
-  const numNights = nightsBetween(startDate, endDate);
-  const nights: StayNightPrice[] = [];
-  let totalPrice = 0;
+  date: Date,
+  limits: PricingLimits,
+): NightPriceBreakdown {
+  const covering = rulesForNight(rules, date);
+  const clamped = applyDefensiveLimits(covering, limits);
+  return calculateNightPrice(basePrice, clamped.rules, clamped.exceeded);
+}
 
-  for (let i = 0; i < numNights; i += 1) {
-    const date = addDaysUtc(startDate, i);
-    const covering = rulesForNight(rules, date);
-    const clamped = applyDefensiveLimits(covering, limits);
-    const breakdown = calculateNightPrice(basePrice, clamped.rules, clamped.exceeded);
-
-    nights.push({ date, ...breakdown });
-    totalPrice += breakdown.finalPrice;
+/** جمع امن (بدون سرریز Int32) قیمت شب‌ها؛ در سرریز `null` برمی‌گرداند. */
+function sumNightPricesSafe(nightlyPrices: number[]): number | null {
+  let total = 0;
+  for (const price of nightlyPrices) {
+    total += price;
+    if (total > MAX_INT32) return null;
   }
-
-  return { nights, totalPrice };
+  return total;
 }
 
 /** یک شبِ محاسبه‌شده برای پاسخ قیمت (شامل تاریخ). */
@@ -187,30 +184,36 @@ export interface QuotedNight {
 
 export interface QuotedStay {
   nights: QuotedNight[];
+  /** جمع کل — در محدوده‌ی Int32؛ در سرریز `AppError(BOOKING_TOTAL_OVERFLOW)` پرتاب می‌شود. */
   totalPrice: number;
+  /** اگر هر شبی سقف‌ها را نقض کرده باشد true (یک بار در سطح اقامت). */
+  limitsExceeded: boolean;
 }
 
 /**
- * قیمت یک بازه‌ی اقامت `[startDate, endDate)` را از روی
- * قواعدِ از قبل انتخاب‌شده محاسبه می‌کند. همان منطق `calculateStayPrice`
- * است اما شب‌ها را به‌شکل موردنیاز API بازمی‌گرداند.
+ * قیمت یک بازه‌ی اقامت `[startDate, endDate)` را از روی قواعدِ از قبل انتخاب‌شده
+ * محاسبه می‌کند. شب‌ها `startDate .. endDate-1` هستند و هر شب از `priceNight`
+ * رد می‌شود.
+ *
+ * جمع کل با همان منطق سرریزِ امنِ رزرو محاسبه می‌شود؛ در سرریز همان
+ * `BOOKING_TOTAL_OVERFLOW` پرتاب می‌شود تا رزرو و quote دقیقاً یک رفتار داشته باشند.
  */
 export function quoteStayPrice(
   basePrice: number,
   rules: PricingRule[],
   startDate: Date,
   endDate: Date,
-  limits: PricingLimits = PRICING_LIMITS,
+  limits: PricingLimits,
 ): QuotedStay {
   const numNights = nightsBetween(startDate, endDate);
   const nights: QuotedNight[] = [];
-  let totalPrice = 0;
+  let limitsExceeded = false;
 
   for (let i = 0; i < numNights; i += 1) {
     const date = addDaysUtc(startDate, i);
-    const covering = rulesForNight(rules, date);
-    const clamped = applyDefensiveLimits(covering, limits);
-    const breakdown = calculateNightPrice(basePrice, clamped.rules, clamped.exceeded);
+    const breakdown = priceNight(basePrice, rules, date, limits);
+
+    if (breakdown.limitsExceeded) limitsExceeded = true;
 
     nights.push({
       date,
@@ -221,10 +224,18 @@ export function quoteStayPrice(
       appliedRules: breakdown.appliedRules,
       limitsExceeded: breakdown.limitsExceeded,
     });
-    totalPrice += breakdown.finalPrice;
   }
 
-  return { nights, totalPrice };
+  const totalPrice = sumNightPricesSafe(nights.map((night) => night.finalPrice));
+  if (totalPrice === null) {
+    throw new AppError(
+      "The computed booking total exceeds the supported range",
+      HTTP_STATUS.BAD_REQUEST,
+      ErrorCode.BOOKING_TOTAL_OVERFLOW,
+    );
+  }
+
+  return { nights, totalPrice, limitsExceeded };
 }
 
 interface DayStat {
@@ -272,15 +283,13 @@ function mergeViolationDays(
 export function validateRuleSet(
   candidateActiveRules: PricingRule[],
   today: Date,
-  limits: PricingLimits = PRICING_LIMITS,
-  horizonEnd?: Date,
+  limits: PricingLimits,
 ): RuleLimitViolation[] {
   let end = addDaysUtc(today, limits.priceRuleMaxFutureDays);
 
   for (const rule of candidateActiveRules) {
     if (rule.endDate && rule.endDate.getTime() > end.getTime()) end = rule.endDate;
   }
-  if (horizonEnd && horizonEnd.getTime() > end.getTime()) end = horizonEnd;
 
   const totalDays = nightsBetween(today, end) + 1;
   const active = candidateActiveRules.filter((rule) => rule.isActive);

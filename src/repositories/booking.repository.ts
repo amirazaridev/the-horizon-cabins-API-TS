@@ -192,29 +192,6 @@ export async function createBookingNights(
   return count;
 }
 
-/** شب‌های یک رزرو (اسنپ‌شات تغییرناپذیر) برای پاسخ API. */
-export async function findBookingNights(bookingId: number, db: Db = prisma) {
-  return db.bookingNight.findMany({
-    where: { bookingId },
-    orderBy: { date: "asc" },
-    select: {
-      date: true,
-      basePrice: true,
-      discountPercent: true,
-      surchargePercent: true,
-      finalPrice: true,
-      appliedRules: true,
-    },
-  });
-}
-
-export async function updateBooking(
-  id: number,
-  data: Prisma.BookingUpdateInput,
-  db: Db = prisma,
-): Promise<Booking> {
-  return db.booking.update({ where: { id }, data });
-}
 /** فقط اگر هنوز pending و مهلت پرداخت نگذشته باشد، تایید می‌کند. */
 export async function confirmPendingBooking(
   id: number,

@@ -1,32 +1,41 @@
 /**
  * تایپ‌های مشترک سیستم قیمت‌گذاری پویا.
  *
- * این فایل عمداً هیچ وابستگی‌ای به Prisma Client ندارد تا ماژول موتور قیمت‌گذاری
- * (`src/utils/pricing.engine.ts`) کاملاً pure و قابل‌تست بماند. نام‌های `RuleType`
- * و `RuleKind` با enumهای تولیدی Prisma (`PriceRuleType`/`PriceRuleKind`) هم‌شکل‌اند.
+ * `RuleType` و `RuleKind` عیناً از enumهای تولیدی Prisma گرفته می‌شوند تا هیچ
+ * union دستیِ موازی‌ای نداشته باشیم و کست‌های `as PricingRule[]` حذف شوند.
+ * با این حال این فایل فقط **type** ایمپورت می‌کند (type-only)، پس در runtime
+ * هیچ وابستگی‌ای به Prisma Client ایجاد نمی‌شود و موتور قیمت‌گذاری pure می‌ماند.
  */
 
-/** نوع قاعده: تخفیف یا افزایش قیمت. */
-export type RuleType = "discount" | "surcharge";
+import type {
+  PriceRule as PrismaPriceRule,
+  PriceRuleKind as PrismaPriceRuleKind,
+  PriceRuleType as PrismaPriceRuleType,
+} from "../generated/prisma/client.js";
 
-/** شکل قاعده: بازه‌ی تاریخی یا روز هفته. */
-export type RuleKind = "dateRange" | "weekday";
+/** نوع قاعده: تخفیف یا افزایش قیمت (enum تولیدی Prisma). */
+export type RuleType = PrismaPriceRuleType;
+
+/** شکل قاعده: بازه‌ی تاریخی یا روز هفته (enum تولیدی Prisma). */
+export type RuleKind = PrismaPriceRuleKind;
 
 /**
  * حداقلِ شکلی از یک قاعده که موتور قیمت‌گذاری به آن نیاز دارد.
- * هم ردیف واقعی `PriceRule` و هم fixtureهای تست این قرارداد را برآورده می‌کنند.
+ * مستقیم از ردیف `PriceRule` مشتق می‌شود، پس هم ردیف واقعی Prisma و هم
+ * fixtureهای تست بدون کست این قرارداد را برآورده می‌کنند.
  */
-export interface PricingRule {
-  id: number;
-  type: RuleType;
-  kind: RuleKind;
-  percent: number;
-  startDate: Date | null;
-  endDate: Date | null;
-  weekdays: number[];
-  isActive: boolean;
-  label: string | null;
-}
+export type PricingRule = Pick<
+  PrismaPriceRule,
+  | "id"
+  | "type"
+  | "kind"
+  | "percent"
+  | "startDate"
+  | "endDate"
+  | "weekdays"
+  | "isActive"
+  | "label"
+>;
 
 /** اسنپ‌شات قاعده‌ای که واقعاً روی یک شب اعمال شده (برای ذخیره در BookingNight.appliedRules). */
 export interface AppliedRule {
@@ -51,12 +60,6 @@ export interface NightPriceBreakdown {
 /** تفکیک قیمت یک شب مشخص از اقامت. */
 export interface StayNightPrice extends NightPriceBreakdown {
   date: Date;
-}
-
-/** نتیجه‌ی محاسبه‌ی قیمت کل اقامت. */
-export interface StayPriceResult {
-  nights: StayNightPrice[];
-  totalPrice: number;
 }
 
 /** سقف‌های قابل‌تنظیم قیمت‌گذاری (بعداً از جدول Setting خوانده می‌شوند). */

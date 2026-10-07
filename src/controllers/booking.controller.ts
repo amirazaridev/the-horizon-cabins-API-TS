@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import * as bookingService from "../services/booking.service.js";
 import { sendSuccess } from "../utils/apiResponse.js";
+import { getIntParam, getQuery } from "../utils/request.util.js";
 import type { BookedDatesQuery, BookingFilters } from "../types/booking.types.js";
 
 export async function create(req: Request, res: Response): Promise<void> {
@@ -10,7 +11,7 @@ export async function create(req: Request, res: Response): Promise<void> {
 
 export async function getAll(req: Request, res: Response): Promise<void> {
   const { skip, limit, page } = req.pagination!;
-  const query = req.parseQuery as BookingFilters;
+  const query = getQuery<BookingFilters>(req);
 
   const filters: BookingFilters = {
     status: query.status,
@@ -34,7 +35,7 @@ export async function getAll(req: Request, res: Response): Promise<void> {
 
 export async function getById(req: Request, res: Response): Promise<void> {
   const booking = await bookingService.getBookingById(
-    Number(req.params.id),
+    getIntParam(req, "id"),
     req.user!.id,
     req.user!.role,
   );
@@ -42,24 +43,24 @@ export async function getById(req: Request, res: Response): Promise<void> {
 }
 
 export async function pay(req: Request, res: Response): Promise<void> {
-  const booking = await bookingService.payBooking(Number(req.params.id), req.user!.id);
+  const booking = await bookingService.payBooking(getIntParam(req, "id"), req.user!.id);
   sendSuccess(res, { data: { booking } });
 }
 
 export async function cancel(req: Request, res: Response): Promise<void> {
-  const booking = await bookingService.cancelBooking(Number(req.params.id), req.user!.id);
+  const booking = await bookingService.cancelBooking(getIntParam(req, "id"), req.user!.id);
   sendSuccess(res, { data: { booking } });
 }
 
 export async function updateStatus(req: Request, res: Response): Promise<void> {
-  const id = Number(req.params.id);
+  const id = getIntParam(req, "id");
   const booking = await bookingService.updateBookingStatus(id, req.body);
   sendSuccess(res, { data: { booking } });
 }
 
 export async function getBookedDates(req: Request, res: Response): Promise<void> {
-  const cabinId = Number(req.params.cabinId);
-  const { from, to } = req.parseQuery as BookedDatesQuery;
+  const cabinId = getIntParam(req, "cabinId");
+  const { from, to } = getQuery<BookedDatesQuery>(req);
 
   const bookedDates = await bookingService.getBookedDates(cabinId, { from, to });
   sendSuccess(res, { data: { bookedDates } });

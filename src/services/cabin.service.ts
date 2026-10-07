@@ -10,6 +10,8 @@ import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import type { PaginatedResult } from "../types/pagination.types.js";
 import { CabinFilters, CabinWithPricing } from "../types/cabin.types.js";
+import { prisma } from "../config/database.js";
+import { rebuildCabinPriceCalendar } from "./price-calendar.service.js";
 
 type CreateCabinInput = z.infer<typeof createCabinSchema.body>;
 type UpdateCabinInput = z.infer<typeof updateCabinSchema.body>;
@@ -47,9 +49,6 @@ export async function getCabinById(id: number): Promise<Cabin> {
   if (!cabin) throw new AppError("Cabin not found!", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
   return cabin;
 }
-
-/** قیمت‌گذاری یک بازه — منطق در booking.service است (موتور مشترک). */
-export { getPriceQuote } from "./booking.service.js";
 
 export async function getCabinCategories(cabinId: number): Promise<Category[]> {
   const cabin = await cabinRepository.findCabinById(cabinId);
@@ -104,11 +103,19 @@ export async function createCabin(
   }
 
   try {
-    return await cabinRepository.createCabin({
-      ...cabinData,
-      images: uploadedUrls,
-      city: { connect: { id: cityId } },
+    const cabinCreated = await prisma.$transaction(async (tx) => {
+      const cabin = await cabinRepository.createCabin(
+        {
+          ...cabinData,
+          images: uploadedUrls,
+          city: { connect: { id: cityId } },
+        },
+        tx,
+      );
+      await rebuildCabinPriceCalendar(tx, cabin.id);
+      return cabin;
     });
+    return cabinCreated;
   } catch (error) {
     await removeUploadedImages(uploadedUrls.map(extractFilePath));
     throw error;
@@ -136,13 +143,15 @@ export async function updateCabin(
     );
   }
 
-  const { cityId, ...rest } = input;
+  const cabin = input;
+  const priceChanged =
+    cabin.regularPrice !== undefined && cabin.regularPrice !== existingCabin.regularPrice;
 
   try {
-    const updatedCabin = await cabinRepository.updateCabin(id, {
-      ...rest,
-      images: finalImages,
-      ...(cityId !== undefined && { city: { connect: { id: cityId } } }),
+    const updatedCabin = await prisma.$transaction(async (tx) => {
+      const cabinUpd = await cabinRepository.updateCabin(id, { ...cabin, images: finalImages }, tx);
+      if (priceChanged) await rebuildCabinPriceCalendar(tx, id);
+      return cabinUpd;
     });
 
     const removedImages = (existingCabin.images ?? []).filter(

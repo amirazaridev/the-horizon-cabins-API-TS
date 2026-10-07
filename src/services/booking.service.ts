@@ -7,7 +7,6 @@ import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { getBookingSettings, TIMEZONE } from "../constants/booking.constants.js";
 import { isValidStatusTransition, hasFullBookingAccess } from "../utils/booking.util.js";
 import { simulatePaymentGateway } from "../utils/payment.util.js";
-import { sumNightPrices } from "../utils/booking-price.util.js";
 import { validateStayRange } from "../utils/booking-date.util.js";
 import { quoteStayPrice } from "../utils/pricing.engine.js";
 import { withSerializableRetry } from "../utils/transaction.util.js";
@@ -16,6 +15,7 @@ import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as guestRepository from "../repositories/guest.repository.js";
 import * as priceRuleRepository from "../repositories/price-rule.repository.js";
 import { prisma } from "../config/database.js";
+import logger from "../config/logger.js";
 import { getPricingLimits } from "../constants/pricing.constants.js";
 import type { z } from "zod";
 import type {
@@ -25,7 +25,6 @@ import type {
 import type { PaginatedResult, PaginationParams } from "../types/pagination.types.js";
 import { getPaginationMeta } from "../utils/pagination.utils.js";
 import type { BookedDatesQuery, BookingFilters } from "../types/booking.types.js";
-import type { PricingRule } from "../types/pricing.types.js";
 import { addDaysUtc, todayInTimezone } from "../utils/date.util.js";
 
 type CreateBookingInput = z.infer<typeof createBookingSchema.body>;
@@ -129,10 +128,7 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
         }
 
         //* قیمت همیشه از موتور قیمت‌گذاری محاسبه می‌شود (هرگز از CabinDailyPrice خوانده نمی‌شود).
-        const activeRules = (await priceRuleRepository.findActiveRulesForCabin(
-          input.cabinId,
-          tx,
-        )) as unknown as PricingRule[];
+        const activeRules = await priceRuleRepository.findActiveRulesForCabin(input.cabinId, tx);
 
         const quote = quoteStayPrice(
           cabin.regularPrice,
@@ -141,15 +137,14 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
           input.endDate,
           limits,
         );
-
-        const totalPrice = sumNightPrices(quote.nights.map((night) => night.finalPrice));
-        if (totalPrice === null) {
-          throw new AppError(
-            "The computed booking total exceeds the supported range",
-            HTTP_STATUS.BAD_REQUEST,
-            ErrorCode.BOOKING_TOTAL_OVERFLOW,
-          );
+        if (quote.limitsExceeded) {
+          logger.error("Pricing limits exceeded by stored rules while creating a booking", {
+            cabinId: input.cabinId,
+          });
         }
+
+        //* جمع کل به‌صورت سرریز-امن داخل موتور انجام شده است.
+        const totalPrice = quote.totalPrice;
 
         //* شامل بررسی اختیاری expectedTotalPrice (تغییر قیمت بین دو درخواست).
         if (
@@ -209,67 +204,6 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
   //* خواندنِ پاسخ بعد از commit انجام می‌شود تا تراکنش کوتاه بماند و احتمال
   //* write conflict (که به P2034 منجر می‌شود) بالا نرود.
   return (await bookingRepository.findBookingById(created.id)) ?? created;
-}
-
-/**
- * قیمت‌گذاری یک بازه‌ی اقامت (عمومی) — بدون ایجاد رزرو.
- * از همان موتور و همان اعتبارسنجی تاریخِ ساخت رزرو استفاده می‌کند.
- */
-export async function getPriceQuote(
-  cabinId: number,
-  range: { startDate: Date; endDate: Date },
-): Promise<{
-  cabinId: number;
-  startDate: Date;
-  endDate: Date;
-  nights: {
-    date: Date;
-    basePrice: number;
-    discountPercent: number;
-    surchargePercent: number;
-    finalPrice: number;
-    appliedRules: unknown;
-  }[];
-  totalPrice: number;
-  available: boolean;
-}> {
-  const now = new Date();
-  const { startDate, endDate } = validateStayRange(range, now);
-
-  const cabin = await cabinRepository.findCabinById(cabinId);
-  if (!cabin) {
-    throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
-  }
-
-  const limits = await getPricingLimits();
-  const activeRules = (await priceRuleRepository.findActiveRulesForCabin(
-    cabinId,
-  )) as unknown as PricingRule[];
-
-  const quote = quoteStayPrice(cabin.regularPrice, activeRules, startDate, endDate, limits);
-
-  const hasOverlap = await bookingRepository.hasOverlappingBooking(
-    cabinId,
-    startDate,
-    endDate,
-    now,
-  );
-
-  return {
-    cabinId,
-    startDate,
-    endDate,
-    nights: quote.nights.map((night) => ({
-      date: night.date,
-      basePrice: night.basePrice,
-      discountPercent: night.discountPercent,
-      surchargePercent: night.surchargePercent,
-      finalPrice: night.finalPrice,
-      appliedRules: night.appliedRules,
-    })),
-    totalPrice: quote.totalPrice,
-    available: !hasOverlap,
-  };
 }
 
 export async function getAllBookings(

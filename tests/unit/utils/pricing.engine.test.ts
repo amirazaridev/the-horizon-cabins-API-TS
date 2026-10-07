@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   applyDefensiveLimits,
   calculateNightPrice,
-  calculateStayPrice,
+  priceNight,
+  quoteStayPrice,
   rulesForNight,
 } from "../../../src/utils/pricing.engine.js";
 import { PRICING_LIMITS } from "../../../src/constants/pricing.constants.js";
-import logger from "../../../src/config/logger.js";
 import type { PricingRule } from "../../../src/types/pricing.types.js";
 
 /** ساخت قاعده‌ی تست با پیش‌فرض‌های معتبر. */
@@ -30,10 +30,6 @@ function d(ymd: string): Date {
 }
 
 describe("pricing.engine", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
   // ==================================================================
   // rulesForNight
   // ==================================================================
@@ -80,7 +76,7 @@ describe("pricing.engine", () => {
   });
 
   // ==================================================================
-  // calculateNightPrice
+  // calculateNightPrice — nightly formula
   // ==================================================================
   describe("calculateNightPrice", () => {
     it("applies a single discount", () => {
@@ -135,16 +131,90 @@ describe("pricing.engine", () => {
   });
 
   // ==================================================================
-  // calculateStayPrice
+  // priceNight — the single per-night pipeline
   // ==================================================================
-  describe("calculateStayPrice", () => {
-    it("returns one entry per night and the sum of finals", () => {
+  describe("priceNight", () => {
+    it("selects covering rules, clamps them and computes the night price", () => {
+      const wednesday = rule({ id: 1, kind: "weekday", weekdays: [3], percent: 30 });
+
+      const onWed = priceNight(1_000_000, [wednesday], d("2026-01-07"), PRICING_LIMITS);
+      expect(onWed.discountPercent).toBe(30);
+      expect(onWed.finalPrice).toBe(700_000);
+
+      const onTue = priceNight(1_000_000, [wednesday], d("2026-01-06"), PRICING_LIMITS);
+      expect(onTue.discountPercent).toBe(0);
+      expect(onTue.finalPrice).toBe(1_000_000);
+    });
+
+    it("applies the defensive clamp and flags limitsExceeded without throwing", () => {
+      const rules = [
+        rule({ id: 1, percent: 40, startDate: d("2026-01-01"), endDate: d("2026-01-31") }),
+        rule({ id: 2, percent: 40, startDate: d("2026-01-01"), endDate: d("2026-01-31") }),
+        rule({ id: 3, percent: 40, startDate: d("2026-01-01"), endDate: d("2026-01-31") }),
+      ];
+
+      const night = priceNight(10_000_000, rules, d("2026-01-07"), PRICING_LIMITS);
+      expect(night.limitsExceeded).toBe(true);
+      expect(night.discountPercent).toBe(50); // clamped to MAX_TOTAL_DISCOUNT_PERCENT
+      expect(night.finalPrice).toBe(5_000_000);
+    });
+  });
+
+  // ==================================================================
+  // applyDefensiveLimits (safety net)
+  // ==================================================================
+  describe("applyDefensiveLimits (safety net)", () => {
+    it("clamps the discount total to MAX_TOTAL_DISCOUNT_PERCENT and flags the night", () => {
+      const rules = [
+        rule({ id: 1, percent: 40 }),
+        rule({ id: 2, percent: 40 }),
+        rule({ id: 3, percent: 40 }),
+      ];
+
+      const clamped = applyDefensiveLimits(rules, PRICING_LIMITS);
+
+      expect(clamped.exceeded).toBe(true);
+      // top-2 by percent kept (40 + 40 = 80 > 50) → second clamped to 10
+      expect(clamped.rules.map((r) => r.percent)).toEqual([40, 10]);
+
+      const breakdown = calculateNightPrice(10_000_000, clamped.rules, clamped.exceeded);
+      expect(breakdown.discountPercent).toBe(50);
+      expect(breakdown.limitsExceeded).toBe(true);
+      expect(breakdown.finalPrice).toBe(5_000_000);
+    });
+
+    it("enforces the count limit even when the percent total is fine", () => {
+      const rules = [rule({ id: 1, percent: 10 }), rule({ id: 2, percent: 10 }), rule({ id: 3, percent: 10 })];
+
+      const clamped = applyDefensiveLimits(rules, PRICING_LIMITS);
+
+      expect(clamped.exceeded).toBe(true);
+      expect(clamped.rules).toHaveLength(2);
+    });
+
+    it("does not flag when rules are within limits", () => {
+      const clamped = applyDefensiveLimits(
+        [rule({ id: 1, percent: 50 }), rule({ id: 2, type: "surcharge", percent: 100 })],
+        PRICING_LIMITS,
+      );
+
+      expect(clamped.exceeded).toBe(false);
+      expect(clamped.rules).toHaveLength(2);
+    });
+  });
+
+  // ==================================================================
+  // quoteStayPrice
+  // ==================================================================
+  describe("quoteStayPrice", () => {
+    it("returns one entry per night and the overflow-safe sum of finals", () => {
       const range = rule({ id: 1, percent: 50, startDate: d("2026-01-05"), endDate: d("2026-01-31") });
-      const { nights, totalPrice } = calculateStayPrice(
+      const { nights, totalPrice } = quoteStayPrice(
         1_000_000,
         [range],
         d("2026-01-05"),
         d("2026-01-08"),
+        PRICING_LIMITS,
       );
 
       expect(nights).toHaveLength(3);
@@ -159,58 +229,59 @@ describe("pricing.engine", () => {
     it("applies weekday rules only on matching nights of the stay", () => {
       const wednesday = rule({ id: 1, kind: "weekday", weekdays: [3], type: "surcharge", percent: 100 });
       // 2026-01-05 (Mon) .. 2026-01-09 → nights 05,06,07,08 ; only Wed (07) is surcharged.
-      const { nights } = calculateStayPrice(1_000_000, [wednesday], d("2026-01-05"), d("2026-01-09"));
+      const { nights } = quoteStayPrice(1_000_000, [wednesday], d("2026-01-05"), d("2026-01-09"), PRICING_LIMITS);
 
       expect(nights.map((n) => n.finalPrice)).toEqual([1_000_000, 1_000_000, 2_000_000, 1_000_000]);
       expect(nights[2].surchargePercent).toBe(100);
       expect(nights[2].finalPrice).toBe(2_000_000);
     });
-  });
 
-  // ==================================================================
-  // defensive read-time clamp
-  // ==================================================================
-  describe("applyDefensiveLimits (safety net)", () => {
-    it("clamps the discount total to MAX_TOTAL_DISCOUNT_PERCENT and flags the night", () => {
-      const spy = vi.spyOn(logger, "error").mockImplementation(() => undefined as never);
+    it("flags limitsExceeded once at the stay level when any night was clamped", () => {
+      const rules = [1, 2, 3].map((id) =>
+        rule({ id, percent: 40, startDate: d("2026-01-05"), endDate: d("2026-01-31") }),
+      );
+      const quote = quoteStayPrice(1_000_000, rules, d("2026-01-05"), d("2026-01-07"), PRICING_LIMITS);
+
+      expect(quote.limitsExceeded).toBe(true);
+      expect(quote.nights.every((n) => n.limitsExceeded)).toBe(true);
+    });
+
+    it("throws BOOKING_TOTAL_OVERFLOW when the sum leaves the Int32 range", () => {
+      // 30 شب × نزدیک Int32 سقف را رد می‌کند.
+      const bigSurcharge = rule({
+        id: 1,
+        type: "surcharge",
+        percent: 100,
+        startDate: d("2026-01-01"),
+        endDate: d("2026-01-31"),
+      });
+
+      expect(() =>
+        quoteStayPrice(2_000_000_000, [bigSurcharge], d("2026-01-05"), d("2026-01-10"), PRICING_LIMITS),
+      ).toThrowError(/supported range/);
+    });
+
+    it("matches the calendar pipeline night by night (identical numbers)", () => {
       const rules = [
-        rule({ id: 1, percent: 40 }),
-        rule({ id: 2, percent: 40 }),
-        rule({ id: 3, percent: 40 }),
+        rule({ id: 1, kind: "weekday", weekdays: [3, 5], type: "surcharge", percent: 25 }),
+        rule({ id: 2, percent: 10, startDate: d("2026-01-01"), endDate: d("2026-01-31") }),
       ];
 
-      const clamped = applyDefensiveLimits(rules, PRICING_LIMITS);
+      const quote = quoteStayPrice(1_000_000, rules, d("2026-01-05"), d("2026-01-10"), PRICING_LIMITS);
 
-      expect(clamped.exceeded).toBe(true);
-      // top-2 by percent kept (40 + 40 = 80 > 50) → second clamped to 10
-      expect(clamped.rules.map((r) => r.percent)).toEqual([40, 10]);
-      expect(spy).toHaveBeenCalled();
-
-      const breakdown = calculateNightPrice(10_000_000, clamped.rules, clamped.exceeded);
-      expect(breakdown.discountPercent).toBe(50);
-      expect(breakdown.limitsExceeded).toBe(true);
-      expect(breakdown.finalPrice).toBe(5_000_000);
-    });
-
-    it("enforces the count limit even when the percent total is fine", () => {
-      vi.spyOn(logger, "error").mockImplementation(() => undefined as never);
-      const rules = [rule({ id: 1, percent: 10 }), rule({ id: 2, percent: 10 }), rule({ id: 3, percent: 10 })];
-
-      const clamped = applyDefensiveLimits(rules, PRICING_LIMITS);
-
-      expect(clamped.exceeded).toBe(true);
-      expect(clamped.rules).toHaveLength(2);
-    });
-
-    it("does not flag or log when rules are within limits", () => {
-      const spy = vi.spyOn(logger, "error").mockImplementation(() => undefined as never);
-      const clamped = applyDefensiveLimits(
-        [rule({ id: 1, percent: 50 }), rule({ id: 2, type: "surcharge", percent: 100 })],
-        PRICING_LIMITS,
+      // تقویم همان تابع `priceNight` را برای هر شب صدا می‌زند؛ پس باید مو‌به‌مو یکسان باشد.
+      const fromCalendar = quote.nights.map((night) =>
+        priceNight(1_000_000, rules, night.date, PRICING_LIMITS),
       );
 
-      expect(clamped.exceeded).toBe(false);
-      expect(spy).not.toHaveBeenCalled();
+      expect(fromCalendar.map((b) => b.finalPrice)).toEqual(quote.nights.map((n) => n.finalPrice));
+      expect(fromCalendar.map((b) => b.discountPercent)).toEqual(
+        quote.nights.map((n) => n.discountPercent),
+      );
+      expect(fromCalendar.map((b) => b.surchargePercent)).toEqual(
+        quote.nights.map((n) => n.surchargePercent),
+      );
+      expect(fromCalendar.reduce((sum, b) => sum + b.finalPrice, 0)).toBe(quote.totalPrice);
     });
   });
 });
