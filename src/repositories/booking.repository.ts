@@ -248,3 +248,18 @@ export async function expirePendingBookings(
   });
   return result.count;
 }
+
+/** تعداد رزروهای آینده‌ی غیرلغوشده با تعداد مهمان بیشتر از سقف داده‌شده. */
+export async function countUpcomingBookingsAboveGuests(
+  maxGuests: number,
+  today: Date,
+  db: Db = prisma,
+): Promise<number> {
+  return db.booking.count({
+    where: {
+      numGuests: { gt: maxGuests },
+      status: { not: "cancelled" },
+      endDate: { gte: today },
+    },
+  });
+}

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { safeNumber } from "../utils/safeParseNumber.js";
+import { INT4_MAX } from "../constants/settings.constants.js";
 
 /**
  * اعتبارسنجی بدنه‌ی `PATCH /settings`.
@@ -7,45 +8,61 @@ import { safeNumber } from "../utils/safeParseNumber.js";
  * فقط **شکل** هر فیلد (عدد صحیح و کرانِ مطلق) اینجا بررسی می‌شود؛ سازگاری
  * بین‌فیلدی روی مقدار merge‌شده در سرویس انجام می‌گیرد (چون PATCH جزئی است و
  * مقدار فعلی ردیف هم در تصمیم دخیل است).
+ *
+ * سقف‌ها طوری انتخاب شده‌اند که هیچ مقداری ستون‌های int4 را سرریز نکند و
+ * دامنه‌ی معنادار حفظ شود (مثلاً افق رزرو ≤ ۳۶۵ روز، مهلت پرداخت ≤ ۷ روز).
  */
+const BOUNDS = {
+  minBookingLength: { min: 1, max: 365 },
+  maxBookingLength: { min: 1, max: 365 },
+  maxGuests: { min: 1, max: 100 },
+  maxAdvanceBookingDays: { min: 1, max: 365 },
+  maxPendingBookingsPerGuest: { min: 0, max: 100 },
+  paymentDeadlineMinutes: { min: 1, max: 10_080 },
+  maxDiscountsPerNight: { min: 0, max: 10 },
+  maxSurchargesPerNight: { min: 0, max: 10 },
+  maxTotalDiscountPercent: { min: 0, max: 100 },
+  maxTotalSurchargePercent: { min: 0, max: 1000 },
+  maxNightlyPrice: { min: 1, max: INT4_MAX },
+  minRegularPrice: { min: 1, max: INT4_MAX },
+  maxRegularPrice: { min: 1, max: INT4_MAX },
+  startingPriceWindowDays: { min: 1, max: 365 },
+  priceRuleMaxFutureDays: { min: 1, max: 3650 },
+} as const;
 
-/** عدد صحیح با کف (و سقف اختیاری)، با preprocess برای مقادیر رشته‌ای ورودی. */
-function intSchema(min: number, message: string, max?: number) {
-  let schema = z.number({ message }).int({ message }).min(min, { message });
-  if (max !== undefined) schema = schema.max(max, { message });
-  return z.preprocess(safeNumber, schema);
+/** عدد صحیح در بازه‌ی مجاز؛ پیام خطا برای هر نوع نقض جداست. */
+function intSchema(field: keyof typeof BOUNDS) {
+  const { min, max } = BOUNDS[field];
+  return z.preprocess(
+    safeNumber,
+    z
+      .number({ message: `${field} must be a number` })
+      .int({ message: `${field} must be an integer` })
+      .min(min, { message: `${field} must be at least ${min}` })
+      .max(max, { message: `${field} cannot exceed ${max}` }),
+  );
 }
 
-const updateSettingsBodySchema = z
+export const updateSettingsBodySchema = z
   .object({
     // Booking
-    minBookingLength: intSchema(1, "minBookingLength must be at least 1").optional(),
-    maxBookingLength: intSchema(1, "maxBookingLength must be at least 1").optional(),
-    maxGuests: intSchema(1, "maxGuests must be at least 1").optional(),
-    maxAdvanceBookingDays: intSchema(1, "maxAdvanceBookingDays must be at least 1").optional(),
-    maxPendingBookingsPerGuest: intSchema(
-      0,
-      "maxPendingBookingsPerGuest cannot be negative",
-    ).optional(),
-    paymentDeadlineMinutes: intSchema(1, "paymentDeadlineMinutes must be at least 1").optional(),
+    minBookingLength: intSchema("minBookingLength").optional(),
+    maxBookingLength: intSchema("maxBookingLength").optional(),
+    maxGuests: intSchema("maxGuests").optional(),
+    maxAdvanceBookingDays: intSchema("maxAdvanceBookingDays").optional(),
+    maxPendingBookingsPerGuest: intSchema("maxPendingBookingsPerGuest").optional(),
+    paymentDeadlineMinutes: intSchema("paymentDeadlineMinutes").optional(),
 
     // Pricing
-    maxDiscountsPerNight: intSchema(0, "maxDiscountsPerNight cannot be negative").optional(),
-    maxSurchargesPerNight: intSchema(0, "maxSurchargesPerNight cannot be negative").optional(),
-    maxTotalDiscountPercent: intSchema(
-      0,
-      "maxTotalDiscountPercent must be between 0 and 100",
-      100,
-    ).optional(),
-    maxTotalSurchargePercent: intSchema(
-      0,
-      "maxTotalSurchargePercent cannot be negative",
-    ).optional(),
-    maxNightlyPrice: intSchema(1, "maxNightlyPrice must be at least 1").optional(),
-    minRegularPrice: intSchema(1, "minRegularPrice must be at least 1").optional(),
-    maxRegularPrice: intSchema(1, "maxRegularPrice must be at least 1").optional(),
-    startingPriceWindowDays: intSchema(1, "startingPriceWindowDays must be at least 1").optional(),
-    priceRuleMaxFutureDays: intSchema(1, "priceRuleMaxFutureDays must be at least 1").optional(),
+    maxDiscountsPerNight: intSchema("maxDiscountsPerNight").optional(),
+    maxSurchargesPerNight: intSchema("maxSurchargesPerNight").optional(),
+    maxTotalDiscountPercent: intSchema("maxTotalDiscountPercent").optional(),
+    maxTotalSurchargePercent: intSchema("maxTotalSurchargePercent").optional(),
+    maxNightlyPrice: intSchema("maxNightlyPrice").optional(),
+    minRegularPrice: intSchema("minRegularPrice").optional(),
+    maxRegularPrice: intSchema("maxRegularPrice").optional(),
+    startingPriceWindowDays: intSchema("startingPriceWindowDays").optional(),
+    priceRuleMaxFutureDays: intSchema("priceRuleMaxFutureDays").optional(),
   })
   .strict()
   .refine((body) => Object.keys(body).length > 0, {

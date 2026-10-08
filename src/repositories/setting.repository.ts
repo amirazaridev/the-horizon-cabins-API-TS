@@ -1,33 +1,38 @@
-import { prisma } from "../config/database.js";
+import { prisma, type PrismaTransactionClient } from "../config/database.js";
+import { DEFAULT_SETTINGS } from "../constants/settings.constants.js";
 import type { Setting } from "../generated/prisma/client.js";
 import type { SettingsColumns } from "../types/setting.types.js";
+
+type Db = typeof prisma | PrismaTransactionClient;
+
+/** شناسه‌ی ثابت ردیف singleton تنظیمات. */
+export const SETTINGS_ID = 1;
 
 /**
  * دسترسی به ردیف **singleton** تنظیمات.
  *
- * جدول `settings` عمداً یک ردیف دارد؛ همه‌ی توابع روی کوچک‌ترین id کار می‌کنند
- * تا اگر اشتباهاً چند ردیف ساخته شد، رفتار قطعی و تکرارپذیر بماند.
+ * جدول `settings` دقیقاً یک ردیف با id ثابت دارد. برخلاف find-then-create،
+ * `upsert` روی id ثابت است تا درخواست‌های همزمانِ اولیه نتوانند دو ردیف بسازند.
  */
 
-/** ردیف تنظیمات (کوچک‌ترین id) یا `null` اگر هنوز ساخته نشده باشد. */
-export async function findSettings(): Promise<Setting | null> {
-  return prisma.setting.findFirst({ orderBy: { id: "asc" } });
+/** ردیف تنظیمات یا `null` اگر هنوز ساخته نشده باشد. */
+export async function findSettings(db: Db = prisma): Promise<Setting | null> {
+  return db.setting.findUnique({ where: { id: SETTINGS_ID } });
 }
 
-/** ساخت ردیف اولیه‌ی تنظیمات. */
-export async function createSettings(data: SettingsColumns): Promise<Setting> {
-  return prisma.setting.create({ data });
+/** ردیف تنظیمات را (در صورت نبود) می‌سازد و برمی‌گرداند — race-safe. */
+export async function ensureSettings(db: Db = prisma): Promise<Setting> {
+  return db.setting.upsert({
+    where: { id: SETTINGS_ID },
+    create: { id: SETTINGS_ID, ...DEFAULT_SETTINGS },
+    update: {},
+  });
 }
 
-/**
- * نوشتن مقادیر تنظیمات روی ردیف موجود؛ اگر ردیفی وجود نداشته باشد، می‌سازد.
- * کل مقادیر (نه فقط فیلدهای تغییرکرده) نوشته می‌شود چون سرویس از قبل merge
- * کرده است.
- */
-export async function saveSettings(data: SettingsColumns): Promise<Setting> {
-  const existing = await findSettings();
-  if (existing) {
-    return prisma.setting.update({ where: { id: existing.id }, data });
-  }
-  return createSettings(data);
+/** به‌روزرسانی **جزئی**؛ فقط فیلدهای ارسالی نوشته می‌شوند. */
+export async function updateSettings(
+  data: Partial<SettingsColumns>,
+  db: Db = prisma,
+): Promise<Setting> {
+  return db.setting.update({ where: { id: SETTINGS_ID }, data });
 }

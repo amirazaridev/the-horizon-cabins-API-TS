@@ -12,7 +12,10 @@ import {
 } from "./pricing.constants.js";
 import type { SettingsColumns } from "../types/setting.types.js";
 
-/**
+/** بیشترین مقدار قابل‌ذخیره در یک ستون Prisma از نوع `Int` (int4 در Postgres). */
+export const INT4_MAX = 2_147_483_647;
+
+/*
  * مقادیر پیش‌فرض جدول `Setting`.
  *
  * **تنها منبع** پیش‌فرض‌ها: هم برای ساخت ردیف اولیه‌ی singleton استفاده می‌شود و

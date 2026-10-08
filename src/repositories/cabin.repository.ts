@@ -151,3 +151,14 @@ export async function deleteCabin(id: number): Promise<Cabin | null> {
     throw error;
   }
 }
+
+/** تعداد کابین‌هایی که `regularPrice`شان خارج از بازه‌ی [min, max] است. */
+export async function countCabinsOutsidePriceRange(
+  min: number,
+  max: number,
+  db: Db = prisma,
+): Promise<number> {
+  return db.cabin.count({
+    where: { OR: [{ regularPrice: { lt: min } }, { regularPrice: { gt: max } }] },
+  });
+}

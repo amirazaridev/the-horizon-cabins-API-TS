@@ -1,4 +1,5 @@
 import { BOOKING_CONSTANTS } from "./booking.constants.js";
+import { deriveMaxRegularPrice } from "../utils/price-limits.util.js";
 import type { PricingLimits } from "../types/pricing.types.js";
 
 //* سقف‌های قابل‌تنظیم در جدول `Setting` نگهداری می‌شوند و در runtime از
@@ -19,8 +20,9 @@ export const MIN_REGULAR_PRICE = 1_000_000;
  * سقف `regularPrice` طوری مشتق می‌شود که حتی با حداکثر افزایش قیمت هم از
  * `MAX_NIGHTLY_PRICE` عبور نکند: floor(70_000_000 / 2) = 35_000_000.
  */
-export const MAX_REGULAR_PRICE = Math.floor(
-  MAX_NIGHTLY_PRICE / (1 + MAX_TOTAL_SURCHARGE_PERCENT / 100),
+export const MAX_REGULAR_PRICE = deriveMaxRegularPrice(
+  MAX_NIGHTLY_PRICE,
+  MAX_TOTAL_SURCHARGE_PERCENT,
 );
 
 //* از ۳۶۵ به ۱۲۰ روز کاهش می‌یابد

@@ -204,3 +204,12 @@ export async function findAllCabinIds(db: Db = prisma): Promise<number[]> {
   const cabins = await db.cabin.findMany({ select: { id: true }, orderBy: { id: "asc" } });
   return cabins.map((cabin) => cabin.id);
 }
+
+/** تعداد قواعد فعال یک نوع که `percent`شان از سقف داده‌شده بیشتر است. */
+export async function countActiveRulesAbovePercent(
+  type: PriceRuleType,
+  percent: number,
+  db: Db = prisma,
+): Promise<number> {
+  return db.priceRule.count({ where: { type, isActive: true, percent: { gt: percent } } });
+}
