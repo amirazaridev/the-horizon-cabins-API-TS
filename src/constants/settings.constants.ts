@@ -42,32 +42,23 @@ export const DEFAULT_SETTINGS: SettingsColumns = {
 };
 
 /**
- * کلیدهای ستون‌های تنظیمات — برای پیمایش/کپی/دیفِ عمومی بدون تکرار نام‌ها.
- * با `satisfies` تضمین می‌شود که دقیقاً کلیدهای `SettingsColumns` هستند.
+ * کلیدهای ستون‌های تنظیمات — از روی `DEFAULT_SETTINGS` ساخته می‌شود.
+ *
+ * چون `DEFAULT_SETTINGS` از نوع `SettingsColumns` است، افزودن ستون جدید بدون
+ * به‌روزرسانی آن باعث خطای TS می‌شود؛ پس این لیست همیشه exhaustive است (برخلاف
+ * `satisfies readonly (keyof ...)[]` که فقط زیرمجموعه‌بودن را تضمین می‌کرد).
  */
-export const SETTINGS_FIELDS = [
-  "minBookingLength",
-  "maxBookingLength",
-  "maxGuests",
-  "maxAdvanceBookingDays",
-  "maxPendingBookingsPerGuest",
-  "paymentDeadlineMinutes",
-  "maxDiscountsPerNight",
-  "maxSurchargesPerNight",
-  "maxTotalDiscountPercent",
-  "maxTotalSurchargePercent",
-  "maxNightlyPrice",
-  "minRegularPrice",
-  "maxRegularPrice",
-  "startingPriceWindowDays",
-  "priceRuleMaxFutureDays",
-] as const satisfies readonly (keyof SettingsColumns)[];
+export const SETTINGS_FIELDS = Object.keys(DEFAULT_SETTINGS) as (keyof SettingsColumns)[];
 
 /**
  * فیلدهایی که تغییرشان مقادیر **ذخیره‌شده** در تقویم قیمت را متأثر می‌کند و
  * بنابراین نیازمند rebuild خودکار تقویم است:
- * - `maxAdvanceBookingDays` اندازه‌ی پنجره‌ی تقویم را عوض می‌کند.
- * - چهار سقف دیگر ورودیِ clamp دفاعی موتور قیمت‌گذاری هستند.
+ * - `maxAdvanceBookingDays`: اندازه‌ی پنجره‌ی تقویم را عوض می‌کند.
+ * - چهار سقف دیگر ورودیِ clamp دفاعی موتور قیمت‌گذاری‌اند (`applyDefensiveLimits`).
+ *
+ * `maxNightlyPrice`، `minRegularPrice` و `maxRegularPrice` عمداً در این لیست
+ * نیستند: نه موتور قیمت‌گذاری و نه سازنده‌ی تقویم از آن‌ها استفاده نمی‌کنند
+ * (فقط در اعتبارسنجی ورودی نقش دارند)، پس تغییرشان مقدار ذخیره‌شده را عوض نمی‌کند.
  */
 export const PRICING_AFFECTING_SETTINGS = [
   "maxAdvanceBookingDays",
