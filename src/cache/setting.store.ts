@@ -5,23 +5,6 @@ import type { AppSettings, SettingsColumns } from "../types/setting.types.js";
 import type { PricingLimits } from "../types/pricing.types.js";
 import type { Setting } from "../generated/prisma/client.js";
 
-/*
- * کش در حافظه‌ی تنظیمات + نگاشت به سقف‌های دامنه.
- *
- * چرا کش؟ مسیرهای داغ (رزرو، quote، تقویم قیمت) در هر درخواست چند بار به
- * سقف‌ها نیاز دارند و خواندن DB در هر بار هم پرهزینه است و هم باعث می‌شود
- * getterها async شوند (که به کل لایه‌ی validation و utils سرریز می‌کند).
- * بنابراین تنظیمات یک‌بار در استارت سرور از DB خوانده می‌شود و پس از هر
- * `PATCH` موفق (و هر خواندنِ GET) به‌روز می‌شود.
- *
- * ⚠️ محدودیت چند-نمونه‌ای (multi-instance): این کش per-process است. اگر چند
- * نمونه‌ی سرور بالا باشد، تغییرِ یک نمونه فوراً به کش نمونه‌های دیگر نمی‌رسد.
- * راهکار در استقرار چند-نمونه‌ای: TTL کوتاه + `refreshSettings()`، یا
- * invalidation مبتنی بر pub/sub. در تک‌نمونه (وضعیت فعلی پروژه) مسئله‌ای نیست.
- *
- * ⚠️ این ماژول به هیچ سرویس دیگری وابسته نیست تا price-calendar.service بتواند
- * بدون ایجاد حلقه‌ی import از آن استفاده کند.
- */
 
 /** مقادیر مشتق‌شده را از ستون‌های پایه می‌سازد (frozen). */
 export function deriveSettings(columns: SettingsColumns): Readonly<AppSettings> {
@@ -73,11 +56,7 @@ export function getPricingLimits(): Readonly<PricingLimits> {
   return state.pricingLimits;
 }
 
-/**
- * یک ردیف Prisma را روی کش اعمال می‌کند — **فقط اگر از کش قدیمی‌تر نباشد**.
- * این گارد جلوی rollback کش به یک اسنپ‌شات قدیمی‌تر (در رقابت GET با PATCH) را
- * می‌گیرد و همیشه جدیدترین حالت را برمی‌گرداند.
- */
+
 export function applySettingsRow(row: Setting): Readonly<AppSettings> {
   if (state.rowUpdatedAt === null || row.updatedAt.getTime() >= state.rowUpdatedAt.getTime()) {
     state = buildState(pickSettingsColumns(row), row.updatedAt);

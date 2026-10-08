@@ -48,7 +48,7 @@ function intSchema(field: keyof typeof BOUNDS) {
   );
 }
 
-export const updateSettingsBodySchema = z
+export const updateSettingsFields = z
   .object({
     // Booking
     minBookingLength: intSchema("minBookingLength").optional(),
@@ -69,10 +69,13 @@ export const updateSettingsBodySchema = z
     startingPriceWindowDays: intSchema("startingPriceWindowDays").optional(),
     priceRuleMaxFutureDays: intSchema("priceRuleMaxFutureDays").optional(),
   })
-  .strict()
-  .refine((body) => Object.keys(body).length > 0, {
-    message: "At least one field must be provided",
-  });
+  .strict();
+
+/** اسکیمای نهایی بدنه — علاوه بر فیلدها، خالی‌نبودن را هم الزام می‌کند. */
+export const updateSettingsBodySchema = updateSettingsFields.refine(
+  (body) => Object.keys(body).length > 0,
+  { message: "At least one field must be provided" },
+);
 
 export const updateSettingsSchema = {
   body: updateSettingsBodySchema,

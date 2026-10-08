@@ -105,11 +105,19 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
   // ==================================================================
   describe("PATCH", () => {
     it("persists a partial update and reflects it on the next GET", async () => {
-      await request(app)
+      const patch = await request(app)
         .patch(SETTINGS_PATH)
         .set("Cookie", cookieFor(owner))
-        .send({ maxBookingLength: 20, paymentDeadlineMinutes: 45 })
-        .expect(200);
+        .send({ maxBookingLength: 20, paymentDeadlineMinutes: 45 });
+
+      expect(patch.status).toBe(200);
+      // شکل پاسخ بدون تغییر مانده: { status, data: { settings } }.
+      expect(patch.body.status).toBe("success");
+      expect(patch.body.data.settings).toMatchObject({
+        maxBookingLength: 20,
+        paymentDeadlineMinutes: 45,
+      });
+      expect(patch.body.data.calendarRowsRebuilt).toBeUndefined();
 
       const res = await request(app).get(SETTINGS_PATH).set("Cookie", cookieFor(admin));
       expect(res.body.data.settings).toMatchObject({
@@ -119,6 +127,25 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
 
       const row = await prisma.setting.findFirst();
       expect(row).toMatchObject({ maxBookingLength: 20, paymentDeadlineMinutes: 45 });
+    });
+
+    it("is a no-op (no updatedAt change) when the value is unchanged", async () => {
+      await request(app)
+        .patch(SETTINGS_PATH)
+        .set("Cookie", cookieFor(owner))
+        .send({ maxBookingLength: 20 })
+        .expect(200);
+      const before = await prisma.setting.findFirst();
+
+      const res = await request(app)
+        .patch(SETTINGS_PATH)
+        .set("Cookie", cookieFor(owner))
+        .send({ maxBookingLength: 20 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.calendarRowsRebuilt).toBeUndefined();
+      const after = await prisma.setting.findFirst();
+      expect(after!.updatedAt.getTime()).toBe(before!.updatedAt.getTime());
     });
 
     it("rejects an empty body", async () => {

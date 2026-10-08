@@ -43,7 +43,7 @@ const prismaErrorMap: Record<
   },
   P2039: {
     statusCode: HTTP_STATUS.CONFLICT,
-    code: ErrorCode.BOOKING_DATE_OVERLAP,
+    code: ErrorCode.TRANSACTION_CONFLICT,
     message: "The request conflicted with another operation, please try again",
   },
 };
