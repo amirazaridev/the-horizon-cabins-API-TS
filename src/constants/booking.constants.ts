@@ -26,6 +26,6 @@ export const BOOKING_STATUS_DB: Record<BookingStatus, string> = {
   pending: "pending",
   confirmed: "confirmed",
   cancelled: "cancelled",
-  checkedIn: "checked-in",
-  checkedOut: "checked-out",
+  checkedIn: "checked_in",
+  checkedOut: "checked_out",
 };
