@@ -102,8 +102,9 @@ describe.skipIf(!isIntegrationDbAvailable())("createBooking concurrency (integra
 
   it("should allow disjoint concurrent bookings to all succeed", async () => {
     const userIds = await manyGuests(2);
-    const inputA = { cabinId, ...futureRange(90, 2), numGuests: 1 };
-    const inputB = { cabinId, ...futureRange(120, 2), numGuests: 1 };
+    //* هر دو بازه باید داخل افق ۱۲۰ روزه باشند (endDate <= today + 120).
+    const inputA = { cabinId, ...futureRange(30, 2), numGuests: 1 };
+    const inputB = { cabinId, ...futureRange(60, 2), numGuests: 1 };
 
     const results = await Promise.allSettled([
       createBookingService(inputA, userIds[0]),
@@ -116,7 +117,7 @@ describe.skipIf(!isIntegrationDbAvailable())("createBooking concurrency (integra
 
   it("should not leak a raw database error (500) when the exclusion constraint fires", async () => {
     const userIds = await manyGuests(3);
-    const input = { cabinId, ...futureRange(150), numGuests: 1 };
+    const input = { cabinId, ...futureRange(90), numGuests: 1 };
 
     const results = await Promise.allSettled(
       userIds.map((userId) => createBookingService(input, userId)),

@@ -9,7 +9,9 @@ import { getPaginationMeta } from "../utils/pagination.utils.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import type { PaginatedResult } from "../types/pagination.types.js";
-import { CabinFilters, CabinWithCity } from "../types/cabin.types.js";
+import { CabinFilters, CabinWithPricing } from "../types/cabin.types.js";
+import { prisma } from "../config/database.js";
+import { rebuildCabinPriceCalendar } from "./price-calendar.service.js";
 
 type CreateCabinInput = z.infer<typeof createCabinSchema.body>;
 type UpdateCabinInput = z.infer<typeof updateCabinSchema.body>;
@@ -24,7 +26,7 @@ type GetAllCabinsParams = {
 
 export async function getAllCabins(
   params: GetAllCabinsParams = {},
-): Promise<PaginatedResult<CabinWithCity>> {
+): Promise<PaginatedResult<CabinWithPricing>> {
   const { skip = 0, limit = 10, page = 1, categorySlug, filters } = params;
   const { data, total } = await cabinRepository.findAllCabins({
     skip,
@@ -101,11 +103,19 @@ export async function createCabin(
   }
 
   try {
-    return await cabinRepository.createCabin({
-      ...cabinData,
-      images: uploadedUrls,
-      city: { connect: { id: cityId } },
+    const cabinCreated = await prisma.$transaction(async (tx) => {
+      const cabin = await cabinRepository.createCabin(
+        {
+          ...cabinData,
+          images: uploadedUrls,
+          city: { connect: { id: cityId } },
+        },
+        tx,
+      );
+      await rebuildCabinPriceCalendar(tx, cabin.id);
+      return cabin;
     });
+    return cabinCreated;
   } catch (error) {
     await removeUploadedImages(uploadedUrls.map(extractFilePath));
     throw error;
@@ -121,16 +131,6 @@ export async function updateCabin(
   if (!existingCabin)
     throw new AppError(`Cabin with id ${id} not found`, HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
 
-  const finalPrice = input.regularPrice ?? Number(existingCabin.regularPrice);
-  const finalDiscount = input.discount ?? existingCabin.discount;
-  if (finalDiscount > finalPrice) {
-    throw new AppError(
-      "The discount cannot exceed the original price.",
-      HTTP_STATUS.BAD_REQUEST,
-      ErrorCode.VALIDATION_ERROR,
-    );
-  }
-
   const uploadedUrls = await uploadCabinImages(imageFiles);
   const finalImages = [...(input.keepExistingImages ?? []), ...uploadedUrls];
 
@@ -143,13 +143,15 @@ export async function updateCabin(
     );
   }
 
-  const { cityId, ...rest } = input;
+  const cabin = input;
+  const priceChanged =
+    cabin.regularPrice !== undefined && cabin.regularPrice !== existingCabin.regularPrice;
 
   try {
-    const updatedCabin = await cabinRepository.updateCabin(id, {
-      ...rest,
-      images: finalImages,
-      ...(cityId !== undefined && { city: { connect: { id: cityId } } }),
+    const updatedCabin = await prisma.$transaction(async (tx) => {
+      const cabinUpd = await cabinRepository.updateCabin(id, { ...cabin, images: finalImages }, tx);
+      if (priceChanged) await rebuildCabinPriceCalendar(tx, id);
+      return cabinUpd;
     });
 
     const removedImages = (existingCabin.images ?? []).filter(

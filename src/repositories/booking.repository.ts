@@ -72,6 +72,17 @@ const bookingResponseSelect = {
   guestId: true,
   guest: { select: { id: true, fullName: true } },
   cabin: { select: { id: true, name: true } },
+  nights: {
+    select: {
+      date: true,
+      basePrice: true,
+      discountPercent: true,
+      surchargePercent: true,
+      finalPrice: true,
+      appliedRules: true,
+    },
+    orderBy: { date: "asc" },
+  },
 } satisfies Prisma.BookingSelect;
 
 /**
@@ -89,8 +100,8 @@ export async function findBookingWithOwnerById(id: number) {
 }
 
 /** نسخه‌ی پاسخ API؛ `guest.userId` را برنمی‌گرداند. */
-export async function findBookingById(id: number) {
-  return prisma.booking.findUnique({
+export async function findBookingById(id: number, db: Db = prisma) {
+  return db.booking.findUnique({
     where: { id },
     select: bookingResponseSelect,
   });
@@ -159,13 +170,28 @@ export async function createBooking(
   return db.booking.create({ data });
 }
 
-export async function updateBooking(
-  id: number,
-  data: Prisma.BookingUpdateInput,
-  db: Db = prisma,
-): Promise<Booking> {
-  return db.booking.update({ where: { id }, data });
+export interface BookingNightInput {
+  date: Date;
+  basePrice: number;
+  discountPercent: number;
+  surchargePercent: number;
+  finalPrice: number;
+  appliedRules: Prisma.InputJsonValue;
 }
+
+/** درج اسنپ‌شات قیمت شب‌های یک رزرو (batch). */
+export async function createBookingNights(
+  bookingId: number,
+  nights: BookingNightInput[],
+  db: Db = prisma,
+): Promise<number> {
+  if (nights.length === 0) return 0;
+  const { count } = await db.bookingNight.createMany({
+    data: nights.map((night) => ({ bookingId, ...night })),
+  });
+  return count;
+}
+
 /** فقط اگر هنوز pending و مهلت پرداخت نگذشته باشد، تایید می‌کند. */
 export async function confirmPendingBooking(
   id: number,

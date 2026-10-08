@@ -1,7 +1,14 @@
-import { prisma } from "../config/database.js";
+import { prisma, PrismaTransactionClient } from "../config/database.js";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Cabin } from "../generated/prisma/client.js";
 import { CabinFilters, CabinWithCity } from "../types/cabin.types.js";
+import {
+  enrichWithStartingPrice,
+  findAllCabinsWithPricing,
+  needsPricingPath,
+} from "./cabin-search.repository.js";
+
+type Db = typeof prisma | PrismaTransactionClient;
 
 interface FindAllCabinsParams {
   skip?: number;
@@ -46,6 +53,11 @@ function buildWhereClause(categorySlug?: string, filters?: CabinFilters): Prisma
   return { AND: conditions };
 }
 
+const cabinInclude = {
+  omit: { cityId: true },
+  include: { city: { select: { id: true, name: true } } },
+} as const;
+
 export async function findAllCabins({
   skip = 0,
   limit = 10,
@@ -53,29 +65,9 @@ export async function findAllCabins({
   filters,
 }: FindAllCabinsParams = {}) {
   const where = buildWhereClause(categorySlug, filters);
-  const needsPriceFilter = filters?.price !== undefined;
 
-  if (needsPriceFilter) {
-    const allCabins = await prisma.cabin.findMany({
-      where,
-      omit: { cityId: true },
-      include: {
-        city: {
-          select: { id: true, name: true },
-        },
-      },
-    });
-
-    const { min, max } = filters.price!;
-    const filtered = allCabins.filter((cabin) => {
-      const finalPrice = cabin.regularPrice - cabin.discount;
-      return finalPrice >= min && finalPrice <= max;
-    });
-
-    const total = filtered.length;
-    const paginated = filtered.slice(skip, skip + limit);
-
-    return { data: paginated as CabinWithCity[], total };
+  if (needsPricingPath(filters)) {
+    return findAllCabinsWithPricing({ where, skip, limit, filters: filters! });
   }
 
   const [data, total] = await Promise.all([
@@ -83,21 +75,14 @@ export async function findAllCabins({
       where,
       skip,
       take: limit,
-      omit: {
-        cityId: true,
-      },
-      include: {
-        city: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
+      ...cabinInclude,
     }),
     prisma.cabin.count({ where }),
   ]);
-  return { data: data as CabinWithCity[], total };
+
+  //* مسیر بدون پارامتر قیمت: startingPrice را با یک کوئری گروهی اضافه می‌کنیم.
+  const enriched = await enrichWithStartingPrice(data as CabinWithCity[]);
+  return { data: enriched, total };
 }
 
 export async function findCabinCategories(cabinId: number) {
@@ -121,24 +106,29 @@ export async function setCategoriesForCabin(cabinId: number, categoryIds: number
     }),
   ]);
 }
+
+/** همه‌ی amenities یکتا — به‌جای بارگذاری کل کابین‌ها، در دیتابیس unnest می‌کنیم. */
 export async function findAllAmenities(): Promise<string[]> {
-  const cabins = await prisma.cabin.findMany({
-    select: { amenities: true },
-  });
-  const amenities = cabins.flatMap((cabin) => cabin.amenities);
-  return [...new Set(amenities)];
+  const rows = await prisma.$queryRaw<{ amenity: string }[]>(
+    Prisma.sql`SELECT DISTINCT unnest("amenities") AS amenity FROM "cabins" ORDER BY amenity ASC`,
+  );
+  return rows.map((row) => row.amenity);
 }
 
-export async function findCabinById(id: number): Promise<Cabin | null> {
-  return prisma.cabin.findUnique({ where: { id } });
+export async function findCabinById(id: number, db: Db = prisma): Promise<Cabin | null> {
+  return db.cabin.findUnique({ where: { id } });
 }
 
-export async function createCabin(data: Prisma.CabinCreateInput): Promise<Cabin> {
-  return prisma.cabin.create({ data });
+export async function createCabin(data: Prisma.CabinCreateInput, db: Db = prisma): Promise<Cabin> {
+  return db.cabin.create({ data });
 }
 
-export async function updateCabin(id: number, data: Prisma.CabinUpdateInput): Promise<Cabin> {
-  return prisma.cabin.update({ where: { id }, data });
+export async function updateCabin(
+  id: number,
+  data: Prisma.CabinUpdateInput,
+  db: Db = prisma,
+): Promise<Cabin> {
+  return db.cabin.update({ where: { id }, data });
 }
 
 export async function deleteCabin(id: number): Promise<Cabin | null> {

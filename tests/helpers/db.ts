@@ -12,8 +12,12 @@ import { prisma } from "../../src/config/database.js";
  * اضافه شد، آگاهانه اضافه شود.
  */
 const TRUNCATABLE_TABLES = [
+  "booking_nights",
   "bookings",
   "guests",
+  "price_rule_audits",
+  "price_rules",
+  "cabin_daily_prices",
   "users",
   "cabins",
   "cities",

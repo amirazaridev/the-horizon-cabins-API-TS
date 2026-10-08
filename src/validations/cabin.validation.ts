@@ -2,6 +2,10 @@ import { z } from "zod";
 
 import { safeNumber } from "../utils/safeParseNumber.js";
 import { safeArray } from "../utils/safeArray.js";
+import { MAX_REGULAR_PRICE, MIN_REGULAR_PRICE } from "../constants/pricing.constants.js";
+import { BOOKING_CONSTANTS, TIMEZONE } from "../constants/booking.constants.js";
+import { addDaysUtc, todayInTimezone } from "../utils/date.util.js";
+import { dateOnlySchema } from "./shared.validation.js";
 
 import { paginationQueryValidation } from "./pagination.validation.js";
 import { categorySlugQueryValidation } from "./category.validation.js";
@@ -31,22 +35,13 @@ const cabinBodySchema = z.object({
     z
       .number()
       .int({ message: "Price must be an integer" })
-      .min(0, { message: "Price cannot be negative" })
-      .max(100_000_000, {
-        message: "Price cannot exceed 100,000,000",
+      .min(MIN_REGULAR_PRICE, {
+        message: `Price cannot be less than ${MIN_REGULAR_PRICE}`,
+      })
+      .max(MAX_REGULAR_PRICE, {
+        message: `Price cannot exceed ${MAX_REGULAR_PRICE}`,
       }),
   ),
-
-  discount: z
-    .preprocess(
-      safeNumber,
-      z
-        .number()
-        .int({ message: "Discount must be an integer" })
-        .min(0, { message: "Discount cannot be negative" })
-        .max(100, { message: "Discount cannot exceed 100%" }),
-    )
-    .default(0),
 
   description: z.string().trim().max(1000, {
     message: "Description cannot exceed 1000 characters",
@@ -261,6 +256,15 @@ const cabinFiltersSchema = z.object({
 
   price: priceRangeSchema.optional(),
 
+  //* فیلتر جمع کل صورت‌حساب — فقط همراه با تاریخ‌ها معتبر است.
+  totalPrice: priceRangeSchema.optional(),
+
+  startDate: dateOnlySchema.optional(),
+
+  endDate: dateOnlySchema.optional(),
+
+  sort: z.enum(["price_asc", "price_desc"]).optional(),
+
   cityId: optionalPositiveInt("City ID"),
 
   regionId: optionalPositiveInt("Region ID"),
@@ -278,6 +282,82 @@ const cabinQuerySchema = z
     ...paginationQueryValidation.query.shape,
     ...categorySlugQueryValidation.query.shape,
     ...cabinFiltersSchema.shape,
+  })
+  .superRefine((value, ctx) => {
+    const hasStart = value.startDate !== undefined;
+    const hasEnd = value.endDate !== undefined;
+
+    //* startDate و endDate فقط با هم یا هیچ‌کدام.
+    if (hasStart !== hasEnd) {
+      ctx.addIssue({
+        code: "custom",
+        message: "startDate and endDate must be provided together",
+        path: [hasStart ? "endDate" : "startDate"],
+      });
+      return;
+    }
+
+    //* totalPrice و price با هم مجاز نیستند.
+    if (value.price !== undefined && value.totalPrice !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: "price and totalPrice cannot be used together",
+        path: ["totalPrice"],
+      });
+    }
+
+    //* totalPrice فقط همراه با تاریخ‌ها معتبر است.
+    if (value.totalPrice !== undefined && !hasStart) {
+      ctx.addIssue({
+        code: "custom",
+        message: "totalPrice requires startDate and endDate",
+        path: ["totalPrice"],
+      });
+    }
+
+    if (hasStart && hasEnd) {
+      const today = todayInTimezone(TIMEZONE);
+      const start = value.startDate as Date;
+      const end = value.endDate as Date;
+
+      if (start.getTime() < today.getTime()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "startDate cannot be in the past",
+          path: ["startDate"],
+        });
+      }
+
+      if (end.getTime() <= start.getTime()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "endDate must be after startDate",
+          path: ["endDate"],
+        });
+      }
+
+      if (
+        end.getTime() > addDaysUtc(today, BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS).getTime()
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: `endDate cannot be more than ${BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS} days in the future`,
+          path: ["endDate"],
+        });
+      }
+
+      const nights = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+      if (
+        nights < BOOKING_CONSTANTS.MIN_BOOKING_LENGTH_NIGHTS ||
+        nights > BOOKING_CONSTANTS.MAX_BOOKING_LENGTH_NIGHTS
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Stay must be between ${BOOKING_CONSTANTS.MIN_BOOKING_LENGTH_NIGHTS} and ${BOOKING_CONSTANTS.MAX_BOOKING_LENGTH_NIGHTS} nights`,
+          path: ["endDate"],
+        });
+      }
+    }
   })
   .transform(({ city, cityId, ...rest }) => {
     // `cityId` is the canonical parameter; `city` is kept as a legacy alias.

@@ -3,6 +3,8 @@ import type {
   UserRole,
   BookingStatus,
   CancellationReason,
+  PriceRuleType,
+  PriceRuleKind,
 } from "../../src/generated/prisma/enums.js";
 
 /**
@@ -76,7 +78,6 @@ export interface CreateCabinOptions {
   name?: string;
   maxCapacity?: number;
   regularPrice?: number;
-  discount?: number;
   cityId?: number;
 }
 
@@ -85,7 +86,6 @@ export interface CreatedCabin {
   name: string;
   maxCapacity: number;
   regularPrice: number;
-  discount: number;
   cityId: number;
 }
 
@@ -99,7 +99,6 @@ export async function createCabin(options: CreateCabinOptions = {}): Promise<Cre
       name: options.name ?? `Cabin ${id}`,
       maxCapacity: options.maxCapacity ?? 4,
       regularPrice: options.regularPrice ?? 1_000_000,
-      discount: options.discount ?? 0,
       description: "Test cabin",
       amenities: ["wifi"],
       bedrooms: 2,
@@ -117,7 +116,6 @@ export async function createCabin(options: CreateCabinOptions = {}): Promise<Cre
     name: cabin.name,
     maxCapacity: cabin.maxCapacity,
     regularPrice: cabin.regularPrice,
-    discount: cabin.discount,
     cityId: cabin.cityId,
   };
 }
@@ -186,4 +184,79 @@ export async function createBooking(options: CreateBookingOptions) {
 /** ساخت Date به‌صورت نیمه‌شب UTC از رشته‌ی YYYY-MM-DD. */
 export function utcDate(ymd: string): Date {
   return new Date(`${ymd}T00:00:00.000Z`);
+}
+
+export interface CreatePriceRuleOptions {
+  cabinId: number;
+  /** شناسه‌ی کاربری که قاعده به او نسبت داده می‌شود (createdBy/updatedBy). */
+  actorId: number;
+  type?: PriceRuleType;
+  kind?: PriceRuleKind;
+  percent?: number;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  weekdays?: number[];
+  label?: string | null;
+  isActive?: boolean;
+}
+
+/** ساخت قاعده‌ی قیمت‌گذاری برای تست‌های repository/service. */
+export async function createPriceRule(options: CreatePriceRuleOptions) {
+  const id = nextId();
+  const kind: PriceRuleKind = options.kind ?? "dateRange";
+
+  // پیش‌فرض‌ها باید CHECK دیتابیس را برآورده کنند: dateRange نیازمند هر دو تاریخ،
+  // و weekday نیازمند لیست غیرخالی است.
+  const startDate =
+    options.startDate !== undefined
+      ? options.startDate
+      : kind === "dateRange"
+        ? utcDate("2026-06-01")
+        : null;
+  const endDate =
+    options.endDate !== undefined
+      ? options.endDate
+      : kind === "dateRange"
+        ? utcDate("2026-06-05")
+        : null;
+  const weekdays = options.weekdays ?? (kind === "weekday" ? [3] : []);
+
+  return prisma.priceRule.create({
+    data: {
+      cabinId: options.cabinId,
+      type: options.type ?? "discount",
+      kind,
+      percent: options.percent ?? 10,
+      startDate,
+      endDate,
+      weekdays,
+      label: options.label ?? `Rule ${id}`,
+      isActive: options.isActive ?? true,
+      createdById: options.actorId,
+      updatedById: options.actorId,
+    },
+  });
+}
+
+export interface CreateCabinDailyPriceOptions {
+  cabinId: number;
+  date: Date;
+  basePrice: number;
+  discountPercent?: number;
+  surchargePercent?: number;
+  finalPrice?: number;
+}
+
+/** درج مستقیم یک ردیف تقویم قیمت (برای تست‌های listing/calendar). */
+export async function createCabinDailyPrice(options: CreateCabinDailyPriceOptions) {
+  return prisma.cabinDailyPrice.create({
+    data: {
+      cabinId: options.cabinId,
+      date: options.date,
+      basePrice: options.basePrice,
+      discountPercent: options.discountPercent ?? 0,
+      surchargePercent: options.surchargePercent ?? 0,
+      finalPrice: options.finalPrice ?? options.basePrice,
+    },
+  });
 }

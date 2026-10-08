@@ -5,6 +5,7 @@ import * as bookingService from "../../../src/services/booking.service.js";
 import * as bookingRepository from "../../../src/repositories/booking.repository.js";
 import * as cabinRepository from "../../../src/repositories/cabin.repository.js";
 import * as guestRepository from "../../../src/repositories/guest.repository.js";
+import * as priceRuleRepository from "../../../src/repositories/price-rule.repository.js";
 import { ErrorCode } from "../../../src/constants/errorCodes.js";
 import { HTTP_STATUS } from "../../../src/constants/httpStatus.js";
 import { BOOKING_CONSTANTS, TIMEZONE } from "../../../src/constants/booking.constants.js";
@@ -16,6 +17,7 @@ import { utcDate } from "../../helpers/factories.js";
 vi.mock("../../../src/repositories/booking.repository.js");
 vi.mock("../../../src/repositories/cabin.repository.js");
 vi.mock("../../../src/repositories/guest.repository.js");
+vi.mock("../../../src/repositories/price-rule.repository.js");
 
 // prisma.$transaction فقط برای اجرای callback تراکنش mock می‌شود.
 vi.mock("../../../src/config/database.js", () => ({
@@ -48,14 +50,15 @@ function stubDefaults() {
     id: 1,
     maxCapacity: 4,
     regularPrice: 1_000_000,
-    discount: 10,
   } as never);
+  vi.mocked(priceRuleRepository.findActiveRulesForCabin).mockResolvedValue([] as never);
   vi.mocked(bookingRepository.hasOverlappingBooking).mockResolvedValue(false);
   vi.mocked(bookingRepository.countPendingBookingsForGuest).mockResolvedValue(0);
   vi.mocked(bookingRepository.createBooking).mockResolvedValue({
     id: 1,
     status: "pending",
   } as never);
+  vi.mocked(bookingRepository.createBookingNights).mockResolvedValue(0);
   vi.mocked(bookingRepository.expirePendingBookings).mockResolvedValue(0);
 }
 
@@ -98,8 +101,9 @@ describe("booking.service", () => {
           endDate: validInput.endDate,
           numNights: 2,
           numGuests: 2,
-          cabinPrice: 900_000, // 1,000,000 با ۱۰٪ تخفیف
-          totalPrice: 1_800_000,
+          //* بدون قاعده: cabinPrice = جمع کل اقامت (subtotal)، نه قیمت یک شب.
+          cabinPrice: 2_000_000,
+          totalPrice: 2_000_000,
           status: "pending",
           paymentDeadline: new Date(
             NOW.getTime() + BOOKING_CONSTANTS.PAYMENT_DEADLINE_MINUTES * 60_000,
@@ -109,6 +113,66 @@ describe("booking.service", () => {
         }),
         expect.anything(),
       );
+    });
+
+    it("should write one immutable BookingNight snapshot row per night", async () => {
+      await bookingService.createBooking(validInput, USER_ID);
+
+      const [bookingId, nights] = vi.mocked(bookingRepository.createBookingNights).mock.calls[0];
+      expect(bookingId).toBe(1);
+      expect(nights).toHaveLength(2);
+      expect(nights[0]).toMatchObject({
+        date: validInput.startDate,
+        basePrice: 1_000_000,
+        discountPercent: 0,
+        surchargePercent: 0,
+        finalPrice: 1_000_000,
+      });
+      expect(nights[1].date.getTime()).toBe(utcDate("2026-06-17").getTime());
+    });
+
+    it("should apply active rules through the engine when computing nightly prices", async () => {
+      vi.mocked(priceRuleRepository.findActiveRulesForCabin).mockResolvedValue([
+        {
+          id: 7,
+          type: "discount",
+          kind: "dateRange",
+          percent: 20,
+          startDate: validInput.startDate,
+          endDate: addDaysUtc(validInput.startDate, 10),
+          weekdays: [],
+          isActive: true,
+          label: "تخفیف ویژه",
+        },
+      ] as never);
+
+      await bookingService.createBooking(validInput, USER_ID);
+
+      //* 20% تخفیف روی ۱٬۰۰۰٬۰۰۰ → ۸۰۰٬۰۰۰ برای هر شب، جمع ۱٬۶۰۰٬۰۰۰.
+      expect(bookingRepository.createBooking).toHaveBeenCalledWith(
+        expect.objectContaining({ cabinPrice: 1_600_000, totalPrice: 1_600_000 }),
+        expect.anything(),
+      );
+      const [, nights] = vi.mocked(bookingRepository.createBookingNights).mock.calls[0];
+      expect(nights[0].discountPercent).toBe(20);
+      expect(nights[0].finalPrice).toBe(800_000);
+    });
+
+    it("should reject with 409 PRICE_CHANGED when expectedTotalPrice mismatches", async () => {
+      await expect(
+        bookingService.createBooking({ ...validInput, expectedTotalPrice: 999 }, USER_ID),
+      ).rejects.toMatchObject({
+        statusCode: HTTP_STATUS.CONFLICT,
+        code: ErrorCode.PRICE_CHANGED,
+      });
+      expect(bookingRepository.createBooking).not.toHaveBeenCalled();
+    });
+
+    it("should accept a matching expectedTotalPrice", async () => {
+      await expect(
+        bookingService.createBooking({ ...validInput, expectedTotalPrice: 2_000_000 }, USER_ID),
+      ).resolves.toBeDefined();
+      expect(bookingRepository.createBooking).toHaveBeenCalled();
     });
 
     it("should reject when the guest profile does not exist", async () => {
@@ -167,15 +231,31 @@ describe("booking.service", () => {
       });
     });
 
-    it("should accept a start date exactly at MAX_ADVANCE_BOOKING_DAYS", async () => {
-      const boundary = addDaysUtc(TODAY, BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS);
+    it("should accept an end date exactly at MAX_ADVANCE_BOOKING_DAYS", async () => {
+      //* قاعده‌ی افق روی endDate است: آخرین شب = today + 119؛ پس یک شب با
+      //* endDate = today + 120 (شبِ today + 119) مجاز است.
+      const boundaryEnd = addDaysUtc(TODAY, BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS);
 
       await expect(
         bookingService.createBooking(
-          { ...validInput, startDate: boundary, endDate: addDaysUtc(boundary, 2) },
+          { ...validInput, startDate: addDaysUtc(boundaryEnd, -1), endDate: boundaryEnd },
           USER_ID,
         ),
       ).resolves.toBeDefined();
+    });
+
+    it("should reject an end date beyond MAX_ADVANCE_BOOKING_DAYS", async () => {
+      const tooFarEnd = addDaysUtc(TODAY, BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS + 1);
+
+      await expect(
+        bookingService.createBooking(
+          { ...validInput, startDate: addDaysUtc(tooFarEnd, -1), endDate: tooFarEnd },
+          USER_ID,
+        ),
+      ).rejects.toMatchObject({
+        statusCode: HTTP_STATUS.BAD_REQUEST,
+        code: ErrorCode.BOOKING_INVALID_DATE_RANGE,
+      });
     });
 
     it("should reject an end date equal to the start date", async () => {
@@ -235,7 +315,6 @@ describe("booking.service", () => {
         id: 1,
         maxCapacity: 50,
         regularPrice: 1_000_000,
-        discount: 0,
       } as never);
 
       // maxGuestsPerBooking = 10 → 11 مهمان باید رد شود.

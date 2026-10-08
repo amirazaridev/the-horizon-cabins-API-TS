@@ -3,25 +3,9 @@ import { safeNumber } from "../utils/safeParseNumber.js";
 import { paginationQueryValidation } from "./pagination.validation.js";
 import { BookingStatus } from "../generated/prisma/enums.js";
 import { BOOKING_CONSTANTS } from "../constants/booking.constants.js";
+import { cabinIdParamsSchema, dateOnlySchema, idParamsSchema } from "./shared.validation.js";
 
 const DAY_MS = 86_400_000;
-
-const dateOnlySchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
-  .refine((s) => {
-    const d = new Date(`${s}T00:00:00.000Z`);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-  }, "Invalid calendar date")
-  .transform((s) => new Date(`${s}T00:00:00.000Z`));
-
-const idParamsSchema = z.object({
-  id: z.string().regex(/^\d+$/, { message: "ID must be a number" }).transform(Number),
-});
-
-const cabinIdParamsSchema = z.object({
-  cabinId: z.string().regex(/^\d+$/, { message: "ID must be a number" }).transform(Number),
-});
 
 const createBookingBodySchema = z.object({
   cabinId: z.preprocess(safeNumber, z.number().int().positive()),
@@ -29,6 +13,14 @@ const createBookingBodySchema = z.object({
   endDate: dateOnlySchema,
   numGuests: z.preprocess(safeNumber, z.number().int().min(1)),
   observations: z.string().trim().max(2000).optional(),
+  //* اختیاری: اگر ارسال شود و با قیمت محاسبه‌شده‌ی سرور تفاوت داشته باشد → 409 PRICE_CHANGED.
+  expectedTotalPrice: z.preprocess(safeNumber, z.number().int().nonnegative().optional()),
+});
+
+/** `GET /cabins/:cabinId/price-quote?startDate=&endDate=` */
+const priceQuoteQuerySchema = z.object({
+  startDate: dateOnlySchema,
+  endDate: dateOnlySchema,
 });
 
 const listBookingsQuerySchema = z.object({
@@ -74,6 +66,7 @@ const bookedDatesQuerySchema = z
   );
 
 export const createBookingSchema = { body: createBookingBodySchema };
+export const priceQuoteSchema = { params: cabinIdParamsSchema, query: priceQuoteQuerySchema };
 export const listBookingsQueryValidation = { query: listBookingWithPagQuerySchema };
 export const getBookingSchema = { params: idParamsSchema };
 export const payBookingSchema = { params: idParamsSchema };

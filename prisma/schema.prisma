@@ -12,7 +12,6 @@ datasource db {
   provider = "postgresql"
 }
 
-
 // ================================
 // ENUMS
 // ================================
@@ -50,12 +49,38 @@ enum CancellationReason {
   @@map("cancellation_reason")
 }
 
+/// نوع قاعده‌ی قیمت‌گذاری: تخفیف یا افزایش قیمت.
+enum PriceRuleType {
+  discount
+  surcharge
+
+  @@map("price_rule_type")
+}
+
+/// شکل قاعده: بازه‌ی تاریخی (startDate..endDate) یا روزهای هفته (ISO 1..7).
+enum PriceRuleKind {
+  dateRange @map("date_range")
+  weekday
+
+  @@map("price_rule_kind")
+}
+
+/// عملیاتی که روی یک قاعده ثبت می‌شود (history مستقل از حذف قاعده).
+enum PriceRuleAuditAction {
+  created
+  updated
+  activated
+  deactivated
+  deleted
+
+  @@map("price_rule_audit_action")
+}
+
 /// هدفی که یک کد تایید برای آن صادر شده است.
-/// افزودن مقدار جدید بدون تغییر اسکیمای جدول ممکن است (فقط enum).
 enum OtpPurpose {
-  signup          // تایید ایمیل هنگام ساخت حساب
-  passwordReset   // بازیابی رمز عبور
-  login           // ورود دو مرحله‌ای
+  signup // تایید ایمیل هنگام ساخت حساب
+  passwordReset // بازیابی رمز عبور
+  login // ورود دو مرحله‌ای
 
   @@map("otp_purpose")
 }
@@ -84,18 +109,22 @@ model User {
   lastLoginAttempt   DateTime? @map("last_login_attempt")
   lockedUntil        DateTime? @map("locked_until")
 
-  guest              Guest?
+  guest Guest?
 
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  priceRulesCreated PriceRule[]      @relation("PriceRuleCreatedBy")
+  priceRulesUpdated PriceRule[]      @relation("PriceRuleUpdatedBy")
+  priceRuleAudits   PriceRuleAudit[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
 model Guest {
-  id          Int       @id @default(autoincrement())
-  userId      Int       @unique @map("user_id")
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  id     Int  @id @default(autoincrement())
+  userId Int  @unique @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   fullName    String    @map("full_name") @db.VarChar(100)
   phoneNumber String?   @map("phone_number") @db.VarChar(15)
@@ -103,10 +132,10 @@ model Guest {
   dateOfBirth DateTime? @map("date_of_birth") @db.Date
   gender      Gender?
 
-  bookings    Booking[]
+  bookings Booking[]
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("guests")
 }
@@ -142,29 +171,30 @@ model City {
 }
 
 model Cabin {
-  id           Int       @id @default(autoincrement())
-  name         String    @unique
-  maxCapacity  Int       @map("max_capacity")
-  regularPrice Int       @map("regular_price")
-  discount     Int       @default(0)
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  maxCapacity  Int      @map("max_capacity")
+  regularPrice Int      @map("regular_price")
   description  String
   amenities    String[]
   bedrooms     Int
   bathrooms    Int
-  areaSqm      Float     @map("area_sqm")
+  areaSqm      Float    @map("area_sqm")
   images       String[]
   latitude     Float
   longitude    Float
-  rating       Float     @default(0)
+  rating       Float    @default(0)
 
-  cityId       Int       @map("city_id")
-  city         City      @relation(fields: [cityId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  cityId Int  @map("city_id")
+  city   City @relation(fields: [cityId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  bookings     Booking[]
-  categories   CabinCategory[]
+  bookings    Booking[]
+  categories  CabinCategory[]
+  priceRules  PriceRule[]
+  dailyPrices CabinDailyPrice[]
 
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("cabins")
 }
@@ -196,34 +226,35 @@ model CabinCategory {
 }
 
 model Booking {
-  id                 Int                 @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  startDate          DateTime            @map("start_date")   @db.Date
-  endDate            DateTime            @map("end_date")     @db.Date
-  numNights          Int                 @map("num_nights")
-  numGuests          Int                 @map("num_guests")
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  numNights Int      @map("num_nights")
+  numGuests Int      @map("num_guests")
 
-  cabinPrice         Int                 @map("cabin_price")
-  totalPrice         Int                 @map("total_price")
-
-  status             BookingStatus       @default(pending)
-  paymentDeadline    DateTime            @map("payment_deadline")
-  paidAt             DateTime?           @map("paid_at")
-  paymentReference   String?             @map("payment_reference")
+  cabinPrice       Int           @map("cabin_price")
+  totalPrice       Int           @map("total_price")
+  status           BookingStatus @default(pending)
+  paymentDeadline  DateTime      @map("payment_deadline")
+  paidAt           DateTime?     @map("paid_at")
+  paymentReference String?       @map("payment_reference")
 
   cancelledAt        DateTime?           @map("cancelled_at")
   cancellationReason CancellationReason? @map("cancellation_reason")
 
-  observations       String?             @db.Text
+  observations String? @db.Text
 
-  cabinId            Int                 @map("cabin_id")
-  cabin              Cabin               @relation(fields: [cabinId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  cabinId Int   @map("cabin_id")
+  cabin   Cabin @relation(fields: [cabinId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  guestId            Int                 @map("guest_id")
-  guest              Guest               @relation(fields: [guestId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  guestId Int   @map("guest_id")
+  guest   Guest @relation(fields: [guestId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
+  nights BookingNight[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([cabinId, startDate, endDate])
   @@index([status, paymentDeadline])
@@ -231,62 +262,140 @@ model Booking {
 }
 
 model Setting {
-  id               Int      @id @default(autoincrement())
-  minBookingLength Int      @default(1) @map("min_booking_length")
-  maxBookingLength Int      @default(30) @map("max_booking_length")
-  maxGuests        Int      @default(10) @map("max_guests")
-  breakfastPrice   Int      @default(15) @map("breakfast_price")
+  id               Int @id @default(autoincrement())
+  minBookingLength Int @default(1) @map("min_booking_length")
+  maxBookingLength Int @default(30) @map("max_booking_length")
+  maxGuests        Int @default(10) @map("max_guests")
+  breakfastPrice   Int @default(15) @map("breakfast_price")
 
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
 }
 
 /// کد تایید یک‌بارمصرف (OTP).
-///
-/// ⚠️ اصول امنیتی که این مدل رعایت می‌کند:
-///  - کد هرگز به‌صورت متن خام ذخیره نمی‌شود؛ فقط `codeHash` (bcrypt) نگه داشته
-///    می‌شود تا اگر پایگاه‌داده لو رفت، کدها قابل استفاده نباشند.
-///  - کد **یک‌بارمصرف** است؛ بعد از تایید موفق `status = consumed` می‌شود.
-///  - `expiresAt` منبع حقیقت انقضاست (پلاس TTL قابل تنظیم، نه هاردکد).
-///  - `attempts` سقف تلاش اشتباه را می‌شمارد تا حدس زدن کد (brute-force) متوقف شود.
-///  - برای محدودیت نرخ ارسال، از ردیف‌های همین جدول بر اساس `email + createdAt`
-///    شمارش می‌گیریم؛ نیازی به جدول جداگانه نیست.
-///  - `verificationTokenHash`: پس از تایید موفق، یک توکن یک‌بارمصرف کوتاه‌عمر
-///    صادر می‌شود که در `signup` الزامی است. تنها هش آن ذخیره می‌شود.
 model VerificationCode {
-  id                  Int         @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  /// ایمیل مقصد (نرمال‌شده: lowercase/trim).
-  email               String      @db.VarChar(254)
-  purpose             OtpPurpose
+  /// ایمیل مقصد
+  email   String     @db.VarChar(254)
+  purpose OtpPurpose
 
-  /// هش bcrypt کد ۶ رقمی — کد خام هرگز ذخیره نمی‌شود.
-  codeHash            String      @map("code_hash") @db.VarChar(255)
+  /// هش bcrypt- کد خام هرگز ذخیره نمی‌شود.
+  codeHash String @map("code_hash") @db.VarChar(255)
 
-  status              OtpStatus   @default(pending)
+  status OtpStatus @default(pending)
 
   /// تعداد تلاش‌های اشتباه تا این لحظه.
-  attempts            Int         @default(0)
+  attempts    Int @default(0)
   /// سقف تلاش مجاز — در زمان صدور snapshot می‌شود تا تغییر تنظیمات
   /// بعداً اعتبار ردیف‌های در جریان را عوض نکند.
-  maxAttempts         Int         @map("max_attempts")
+  maxAttempts Int @map("max_attempts")
 
-  expiresAt           DateTime    @map("expires_at")
-  consumedAt          DateTime?   @map("consumed_at")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
 
   /// هش توکن یک‌بارمصرف تایید ایمیل (فقط بعد از verify موفق پر می‌شود).
   verificationTokenHash String?   @unique @map("verification_token_hash") @db.VarChar(255)
   /// انقضای توکن تایید — کوتاه‌تر از عمر نشست، فقط برای تکمیل ثبت‌نام.
   verificationExpiresAt DateTime? @map("verification_expires_at")
 
-  createdAt           DateTime    @default(now()) @map("created_at")
-  updatedAt           DateTime    @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  /// برای «آخرین کد فعال این ایمیل» و کوئری‌های محدودیت نرخ.
   @@index([email, purpose, status])
   /// برای پاک‌سازی دوره‌ای ردیف‌های منقضی.
   @@index([expiresAt])
   @@map("verification_codes")
+}
+
+// ================================
+// DYNAMIC PRICING
+// ================================
+
+/// قاعده‌ی قیمت‌گذاری یک کابین.
+///
+/// - `dateRange`: بازه‌ی تاریخ شامل هر دو سر (startDate..endDate).
+/// - `weekday`: روزهای هفته‌ی ISO (۱=دوشنبه … ۷=یکشنبه).
+model PriceRule {
+  id Int @id @default(autoincrement())
+
+  cabinId Int   @map("cabin_id")
+  cabin   Cabin @relation(fields: [cabinId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  type    PriceRuleType
+  kind    PriceRuleKind
+  percent Int
+
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  weekdays  Int[]
+
+  label    String? @db.VarChar(100)
+  isActive Boolean @default(true) @map("is_active")
+
+  createdById Int  @map("created_by_id")
+  createdBy   User @relation("PriceRuleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  updatedById Int  @map("updated_by_id")
+  updatedBy   User @relation("PriceRuleUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([cabinId, isActive])
+  @@index([isActive, endDate])
+  @@map("price_rules")
+}
+
+model PriceRuleAudit {
+  id        Int                  @id @default(autoincrement())
+  ruleId    Int                  @map("rule_id")
+  cabinId   Int                  @map("cabin_id")
+  action    PriceRuleAuditAction
+  actorId   Int                  @map("actor_id")
+  actor     User                 @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  before    Json?
+  after     Json?
+  createdAt DateTime             @default(now()) @map("created_at")
+
+  @@index([ruleId])
+  @@index([cabinId])
+  @@map("price_rule_audits")
+}
+
+/// read-model تقویم قیمت برای لیست/فیلتر/مرتب‌سازی کابین‌ها.
+model CabinDailyPrice {
+  cabinId Int   @map("cabin_id")
+  cabin   Cabin @relation(fields: [cabinId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  date             DateTime @db.Date
+  basePrice        Int      @map("base_price")
+  discountPercent  Int      @map("discount_percent")
+  surchargePercent Int      @map("surcharge_percent")
+  finalPrice       Int      @map("final_price")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([cabinId, date])
+  @@index([date])
+  @@map("cabin_daily_prices")
+}
+
+/// اسنپ‌شات تغییرناپذیر قیمت هر شب یک رزرو (منبع حقیقت برای نمایش/تاریخ).
+model BookingNight {
+  bookingId Int     @map("booking_id")
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  date             DateTime @db.Date
+  basePrice        Int      @map("base_price")
+  discountPercent  Int      @map("discount_percent")
+  surchargePercent Int      @map("surcharge_percent")
+  finalPrice       Int      @map("final_price")
+
+  /// آرایه‌ای از {id, type, kind, percent, label}.
+  appliedRules Json @map("applied_rules")
+
+  @@id([bookingId, date])
+  @@map("booking_nights")
 }
