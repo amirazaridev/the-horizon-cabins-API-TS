@@ -1,12 +1,12 @@
 import { Prisma } from "../generated/prisma/client.js";
 
 /** کد خطای Prisma برای تضاد در تراکنش‌های Serializable (write conflict / deadlock). */
-const SERIALIZABLE_CONFLICT_CODE = "P2034";
+const SERIALIZABLE_CONFLICT_CODE = ["P2034","P2039"];
 
 function isSerializableConflict(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === SERIALIZABLE_CONFLICT_CODE
+    SERIALIZABLE_CONFLICT_CODE.includes(error.code)
   );
 }
 

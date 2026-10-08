@@ -41,6 +41,11 @@ const prismaErrorMap: Record<
     code: ErrorCode.TRANSACTION_CONFLICT,
     message: "The request conflicted with another operation, please try again",
   },
+  P2039: {
+    statusCode: HTTP_STATUS.CONFLICT,
+    code: ErrorCode.BOOKING_DATE_OVERLAP,
+    message: "The request conflicted with another operation, please try again",
+  },
 };
 
 export const errorHandler = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
