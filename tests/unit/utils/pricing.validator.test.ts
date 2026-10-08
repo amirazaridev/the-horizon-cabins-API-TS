@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateRuleSet } from "../../../src/utils/pricing.engine.js";
-import { PRICING_LIMITS } from "../../../src/constants/pricing.constants.js";
+import { DEFAULT_PRICING_LIMITS } from "../../helpers/settings.js";
 import type { PricingRule } from "../../../src/types/pricing.types.js";
 
 function rule(partial: Partial<PricingRule> & { id: number }): PricingRule {
@@ -27,7 +27,7 @@ function ymd(date: Date): string {
 
 /** 2026-01-05 دوشنبه است. */
 const TODAY = d("2026-01-05");
-const LIMITS = PRICING_LIMITS;
+const LIMITS = DEFAULT_PRICING_LIMITS;
 
 describe("pricing.validator (validateRuleSet)", () => {
   // ==================================================================

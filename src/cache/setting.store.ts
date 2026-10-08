@@ -1,5 +1,5 @@
 import * as settingRepository from "../repositories/setting.repository.js";
-import { DEFAULT_SETTINGS } from "../constants/settings.constants.js";
+import { DEFAULT_SETTINGS } from "../constants/setting.constants.js";
 import { pickSettingsColumns } from "../utils/settings.util.js";
 import type { AppSettings, SettingsColumns } from "../types/setting.types.js";
 import type { PricingLimits } from "../types/pricing.types.js";
@@ -33,7 +33,7 @@ export function deriveSettings(columns: SettingsColumns): Readonly<AppSettings> 
 }
 
 /** نگاشت تنظیمات به سقف‌های موتور قیمت‌گذاری (frozen). */
-function derivePricingLimits(settings: AppSettings): Readonly<PricingLimits> {
+export function toPricingLimits(settings: AppSettings): Readonly<PricingLimits> {
   return Object.freeze({
     maxDiscountsPerNight: settings.maxDiscountsPerNight,
     maxSurchargesPerNight: settings.maxSurchargesPerNight,
@@ -42,7 +42,6 @@ function derivePricingLimits(settings: AppSettings): Readonly<PricingLimits> {
     maxNightlyPrice: settings.maxNightlyPrice,
     minRegularPrice: settings.minRegularPrice,
     maxRegularPrice: settings.maxRegularPrice,
-    maxAdvanceBookingDays: settings.maxAdvanceBookingDays,
     priceCalendarHorizonDays: settings.priceCalendarHorizonDays,
     startingPriceWindowDays: settings.startingPriceWindowDays,
     priceRuleMaxFutureDays: settings.priceRuleMaxFutureDays,
@@ -59,7 +58,7 @@ interface CacheState {
 
 function buildState(columns: SettingsColumns, rowUpdatedAt: Date | null): CacheState {
   const settings = deriveSettings(columns);
-  return { settings, pricingLimits: derivePricingLimits(settings), rowUpdatedAt };
+  return { settings, pricingLimits: toPricingLimits(settings), rowUpdatedAt };
 }
 
 let state: CacheState = buildState(DEFAULT_SETTINGS, null);

@@ -8,19 +8,15 @@ import * as settingRepository from "../repositories/setting.repository.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as priceRuleRepository from "../repositories/price-rule.repository.js";
 import * as bookingRepository from "../repositories/booking.repository.js";
-import { applySettingsRow, refreshSettings } from "./setting.store.js";
-import {
-  INT4_MAX,
-  PRICING_AFFECTING_SETTINGS,
-  SETTINGS_FIELDS,
-} from "../constants/settings.constants.js";
+import { applySettingsRow, refreshSettings } from "../cache/setting.store.js";
+import { PRICING_AFFECTING_SETTINGS, SETTINGS_FIELDS } from "../constants/setting.constants.js";
+import { assertConsistent, type UpdateSettingsInput } from "../validations/setting.validation.js";
 import { rebuildAllCabinPriceCalendars } from "./price-calendar.service.js";
 import { withSerializableRetry } from "../utils/transaction.util.js";
-import { deriveMaxRegularPrice } from "../utils/price-limits.util.js";
 import { pickSettingsColumns } from "../utils/settings.util.js";
 import { todayInTimezone } from "../utils/date.util.js";
 import { TIMEZONE } from "../constants/booking.constants.js";
-import type { AppSettings, SettingsColumns, UpdateSettingsInput } from "../types/setting.types.js";
+import type { AppSettings, SettingsColumns } from "../types/setting.types.js";
 
 export interface SettingsUpdateResult {
   settings: Readonly<AppSettings>;
@@ -33,52 +29,6 @@ export interface SettingsUpdateResult {
 /** خواندن تنظیمات مؤثر — همیشه از DB تازه می‌شود (کش با گارد updatedAt به‌روز می‌شود). */
 export async function getSettings(): Promise<Readonly<AppSettings>> {
   return refreshSettings();
-}
-
-function invalid(message: string, details?: unknown): AppError {
-  return new AppError(message, HTTP_STATUS.BAD_REQUEST, ErrorCode.SETTINGS_INVALID, true, details);
-}
-
-/**
- * سازگاری بین‌فیلدی روی ردیفِ **merge‌شده** (نه فقط فیلدهای ارسالی).
- * توابع pure و بدون I/O؛ در تست‌های unit مستقیم قابل فراخوانی است.
- */
-export function assertConsistent(settings: SettingsColumns): void {
-  if (settings.maxBookingLength < settings.minBookingLength) {
-    throw invalid("maxBookingLength must be greater than or equal to minBookingLength");
-  }
-
-  if (settings.startingPriceWindowDays > settings.maxAdvanceBookingDays) {
-    throw invalid("startingPriceWindowDays cannot exceed maxAdvanceBookingDays");
-  }
-
-  if (settings.maxRegularPrice < settings.minRegularPrice) {
-    throw invalid("maxRegularPrice must be greater than or equal to minRegularPrice");
-  }
-
-  if (settings.maxNightlyPrice < settings.minRegularPrice) {
-    throw invalid("maxNightlyPrice must be greater than or equal to minRegularPrice");
-  }
-
-  const derivedMaxRegularPrice = deriveMaxRegularPrice(
-    settings.maxNightlyPrice,
-    settings.maxTotalSurchargePercent,
-  );
-  if (settings.maxRegularPrice > derivedMaxRegularPrice) {
-    throw invalid(
-      `maxRegularPrice (${settings.maxRegularPrice}) exceeds the allowed maximum ` +
-        `${derivedMaxRegularPrice} derived from maxNightlyPrice (${settings.maxNightlyPrice}) ` +
-        `and maxTotalSurchargePercent (${settings.maxTotalSurchargePercent}); lower it in the same request`,
-    );
-  }
-
-  //* بزرگ‌ترین مقدار ذخیره‌شده = Booking.totalPrice (جمع قیمت شب‌ها). ستون int4 است.
-  if (settings.maxBookingLength * settings.maxNightlyPrice > INT4_MAX) {
-    throw invalid(
-      `maxBookingLength (${settings.maxBookingLength}) × maxNightlyPrice ` +
-        `(${settings.maxNightlyPrice}) exceeds the maximum integer ${INT4_MAX} supported for booking totals`,
-    );
-  }
 }
 
 /** فیلدهایی که ورودی واقعاً تغییرشان می‌دهد (نه فقط حضور در بدنه). */
@@ -167,7 +117,7 @@ function scheduleCalendarRebuild(): Promise<number> {
 }
 
 /**
- * به‌روزرسانی تنظیمات توسط admin/owner.
+ * به‌روزرسانی تنظیمات توسط owner.
  *
  * - خواندن → merge → اعتبارسنجی → نوشتن همه داخل **یک تراکنش Serializable** با
  *   retry برای P2034 انجام می‌شود؛ ردیف از DB خوانده می‌شود نه از کش.

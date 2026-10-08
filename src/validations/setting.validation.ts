@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { safeNumber } from "../utils/safeParseNumber.js";
-import { INT4_MAX } from "../constants/settings.constants.js";
+import { AppError } from "../utils/AppError.js";
+import { ErrorCode } from "../constants/errorCodes.js";
+import { HTTP_STATUS } from "../constants/httpStatus.js";
+import { INT4_MAX } from "../constants/setting.constants.js";
+import { deriveMaxRegularPrice } from "../utils/price-limits.util.js";
+import type { SettingsColumns } from "../types/setting.types.js";
 
 /**
  * اعتبارسنجی بدنه‌ی `PATCH /settings`.
@@ -72,3 +77,54 @@ export const updateSettingsBodySchema = z
 export const updateSettingsSchema = {
   body: updateSettingsBodySchema,
 };
+
+/** ورودی `PATCH /settings` — از روی اسکیمای Zod مشتق می‌شود (بدون نسخه‌ی دست‌نویس). */
+export type UpdateSettingsInput = z.infer<typeof updateSettingsBodySchema>;
+
+function invalid(message: string): AppError {
+  return new AppError(message, HTTP_STATUS.BAD_REQUEST, ErrorCode.SETTINGS_INVALID);
+}
+
+/**
+ * سازگاری بین‌فیلدی روی ردیفِ **merge‌شده** (نه فقط فیلدهای ارسالی)، چون PATCH
+ * جزئی است و مقدار فعلی ردیف هم در تصمیم دخیل است.
+ *
+ * توابع pure و بدون I/O؛ در تست‌های unit مستقیم قابل فراخوانی است.
+ */
+export function assertConsistent(settings: SettingsColumns): void {
+  if (settings.maxBookingLength < settings.minBookingLength) {
+    throw invalid("maxBookingLength must be greater than or equal to minBookingLength");
+  }
+
+  if (settings.startingPriceWindowDays > settings.maxAdvanceBookingDays) {
+    throw invalid("startingPriceWindowDays cannot exceed maxAdvanceBookingDays");
+  }
+
+  if (settings.maxRegularPrice < settings.minRegularPrice) {
+    throw invalid("maxRegularPrice must be greater than or equal to minRegularPrice");
+  }
+
+  if (settings.maxNightlyPrice < settings.minRegularPrice) {
+    throw invalid("maxNightlyPrice must be greater than or equal to minRegularPrice");
+  }
+
+  const derivedMaxRegularPrice = deriveMaxRegularPrice(
+    settings.maxNightlyPrice,
+    settings.maxTotalSurchargePercent,
+  );
+  if (settings.maxRegularPrice > derivedMaxRegularPrice) {
+    throw invalid(
+      `maxRegularPrice (${settings.maxRegularPrice}) exceeds the allowed maximum ` +
+        `${derivedMaxRegularPrice} derived from maxNightlyPrice (${settings.maxNightlyPrice}) ` +
+        `and maxTotalSurchargePercent (${settings.maxTotalSurchargePercent}); lower it in the same request`,
+    );
+  }
+
+  //* بزرگ‌ترین مقدار ذخیره‌شده = Booking.totalPrice (جمع قیمت شب‌ها). ستون int4 است.
+  if (settings.maxBookingLength * settings.maxNightlyPrice > INT4_MAX) {
+    throw invalid(
+      `maxBookingLength (${settings.maxBookingLength}) × maxNightlyPrice ` +
+        `(${settings.maxNightlyPrice}) exceeds the maximum integer ${INT4_MAX} supported for booking totals`,
+    );
+  }
+}

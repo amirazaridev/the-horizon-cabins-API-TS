@@ -1,0 +1,16 @@
+-- AlterTable
+ALTER TABLE "settings" ALTER COLUMN "min_booking_length" DROP DEFAULT,
+ALTER COLUMN "max_booking_length" DROP DEFAULT,
+ALTER COLUMN "max_guests" DROP DEFAULT,
+ALTER COLUMN "max_advance_booking_days" DROP DEFAULT,
+ALTER COLUMN "max_discounts_per_night" DROP DEFAULT,
+ALTER COLUMN "max_nightly_price" DROP DEFAULT,
+ALTER COLUMN "max_pending_bookings_per_guest" DROP DEFAULT,
+ALTER COLUMN "max_regular_price" DROP DEFAULT,
+ALTER COLUMN "max_surcharges_per_night" DROP DEFAULT,
+ALTER COLUMN "max_total_discount_percent" DROP DEFAULT,
+ALTER COLUMN "max_total_surcharge_percent" DROP DEFAULT,
+ALTER COLUMN "min_regular_price" DROP DEFAULT,
+ALTER COLUMN "payment_deadline_minutes" DROP DEFAULT,
+ALTER COLUMN "price_rule_max_future_days" DROP DEFAULT,
+ALTER COLUMN "starting_price_window_days" DROP DEFAULT;

@@ -6,8 +6,8 @@ import {
   bookedDatesSchema,
   getBookingSchema,
 } from "../../../src/validations/booking.validation.js";
-import { BOOKING_CONSTANTS } from "../../../src/constants/booking.constants.js";
-import { currentSettings } from "../../../src/services/setting.store.js";
+import { DEFAULT_SETTINGS } from "../../../src/constants/setting.constants.js";
+import { currentSettings } from "../../../src/cache/setting.store.js";
 
 const DAY_MS = 86_400_000;
 
@@ -245,7 +245,7 @@ describe("booking.validation", () => {
 
     it("should accept a range exactly at the maximum length", () => {
       const from = new Date(Date.UTC(2026, 0, 1));
-      const to = new Date(from.getTime() + BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS * DAY_MS);
+      const to = new Date(from.getTime() + DEFAULT_SETTINGS.maxAdvanceBookingDays + 1 * DAY_MS);
       const result = parse({ from: "2026-01-01", to: to.toISOString().slice(0, 10) });
       expect(result.success).toBe(true);
     });
@@ -253,13 +253,13 @@ describe("booking.validation", () => {
     it("should reject a range longer than BOOKED_DATES_MAX_RANGE_DAYS", () => {
       const from = new Date(Date.UTC(2026, 0, 1));
       const to = new Date(
-        from.getTime() + (BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS + 1) * DAY_MS,
+        from.getTime() + (DEFAULT_SETTINGS.maxAdvanceBookingDays + 1 + 1) * DAY_MS,
       );
       const result = parse({ from: "2026-01-01", to: to.toISOString().slice(0, 10) });
       expect(result.success).toBe(false);
       expect(
         issues(result).some((i) =>
-          i.message.includes(String(BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS)),
+          i.message.includes(String(DEFAULT_SETTINGS.maxAdvanceBookingDays + 1)),
         ),
       ).toBe(true);
     });

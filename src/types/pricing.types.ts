@@ -62,7 +62,7 @@ export interface StayNightPrice extends NightPriceBreakdown {
   date: Date;
 }
 
-/** سقف‌های قابل‌تنظیم قیمت‌گذاری (بعداً از جدول Setting خوانده می‌شوند). */
+/** سقف‌های قابل‌تنظیم قیمت‌گذاری (از جدول `Setting` خوانده می‌شوند). */
 export interface PricingLimits {
   maxDiscountsPerNight: number;
   maxSurchargesPerNight: number;
@@ -71,7 +71,7 @@ export interface PricingLimits {
   maxNightlyPrice: number;
   minRegularPrice: number;
   maxRegularPrice: number;
-  maxAdvanceBookingDays: number;
+  /** افق تقویم قیمت — همان افق رزرو (`maxAdvanceBookingDays`). */
   priceCalendarHorizonDays: number;
   startingPriceWindowDays: number;
   priceRuleMaxFutureDays: number;

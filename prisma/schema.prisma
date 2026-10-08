@@ -261,32 +261,34 @@ model Booking {
   @@map("bookings")
 }
 
-/// تنظیمات سراسری برنامه (تک‌ردیفی).
+/// تنظیمات سراسری برنامه (تک‌ردیفی، id=1).
 ///
-/// این جدول **تنها منبع حقیقت** برای سقف‌های قابل‌تنظیمِ booking و pricing است؛
-/// مقادیر پیش‌فرض ستون‌ها با constantهای کد یکی هستند و پس از تغییر توسط
-/// admin/owner، بلافاصله در runtime اثر می‌گذارند.
+/// **تنها منبع حقیقت** برای سقف‌های قابل‌تنظیمِ booking و pricing. مقادیر توسط
+/// owner از طریق `PATCH /settings` تغییر می‌کنند و بلافاصله در runtime اثر می‌گذارند.
+///
+/// ستون‌ها عمداً `@default` ندارند: ردیف اولیه با مقادیر صریح (`DEFAULT_SETTINGS`)
+/// ساخته می‌شود تا پیش‌فرض‌ها فقط یک منبع داشته باشند.
 model Setting {
   id Int @id @default(autoincrement())
 
   // ── Booking ──────────────────────────────────────────────
-  minBookingLength           Int @default(1) @map("min_booking_length")
-  maxBookingLength           Int @default(30) @map("max_booking_length")
-  maxGuests                  Int @default(10) @map("max_guests")
-  maxAdvanceBookingDays      Int @default(120) @map("max_advance_booking_days")
-  maxPendingBookingsPerGuest Int @default(3) @map("max_pending_bookings_per_guest")
-  paymentDeadlineMinutes     Int @default(30) @map("payment_deadline_minutes")
+  minBookingLength           Int @map("min_booking_length")
+  maxBookingLength           Int @map("max_booking_length")
+  maxGuests                  Int @map("max_guests")
+  maxAdvanceBookingDays      Int @map("max_advance_booking_days")
+  maxPendingBookingsPerGuest Int @map("max_pending_bookings_per_guest")
+  paymentDeadlineMinutes     Int @map("payment_deadline_minutes")
 
   // ── Pricing ──────────────────────────────────────────────
-  maxDiscountsPerNight     Int @default(2) @map("max_discounts_per_night")
-  maxSurchargesPerNight    Int @default(2) @map("max_surcharges_per_night")
-  maxTotalDiscountPercent  Int @default(50) @map("max_total_discount_percent")
-  maxTotalSurchargePercent Int @default(100) @map("max_total_surcharge_percent")
-  maxNightlyPrice          Int @default(70000000) @map("max_nightly_price")
-  minRegularPrice          Int @default(1000000) @map("min_regular_price")
-  maxRegularPrice          Int @default(35000000) @map("max_regular_price")
-  startingPriceWindowDays  Int @default(30) @map("starting_price_window_days")
-  priceRuleMaxFutureDays   Int @default(365) @map("price_rule_max_future_days")
+  maxDiscountsPerNight     Int @map("max_discounts_per_night")
+  maxSurchargesPerNight    Int @map("max_surcharges_per_night")
+  maxTotalDiscountPercent  Int @map("max_total_discount_percent")
+  maxTotalSurchargePercent Int @map("max_total_surcharge_percent")
+  maxNightlyPrice          Int @map("max_nightly_price")
+  minRegularPrice          Int @map("min_regular_price")
+  maxRegularPrice          Int @map("max_regular_price")
+  startingPriceWindowDays  Int @map("starting_price_window_days")
+  priceRuleMaxFutureDays   Int @map("price_rule_max_future_days")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

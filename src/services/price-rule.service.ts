@@ -6,7 +6,7 @@ import { AppError } from "../utils/AppError.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { TIMEZONE } from "../constants/booking.constants.js";
-import { getPricingLimits } from "./setting.store.js";
+import { getPricingLimits } from "../cache/setting.store.js";
 import { addDaysUtc, todayInTimezone } from "../utils/date.util.js";
 import { validateRuleSet } from "../utils/pricing.engine.js";
 import { withSerializableRetry } from "../utils/transaction.util.js";

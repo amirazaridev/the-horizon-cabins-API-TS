@@ -4,7 +4,7 @@ import env from "./config/env.js";
 import logger from "./config/logger.js";
 import { startOtpCleanupJob } from "./jobs/otp-cleanup.job.js";
 import { startPriceCalendarJob } from "./jobs/price-calendar.job.js";
-import { refreshSettings } from "./services/setting.store.js";
+import { refreshSettings } from "./cache/setting.store.js";
 /* eslint-disable n/no-process-exit */
 async function startServer(): Promise<void> {
   const app = createApp();

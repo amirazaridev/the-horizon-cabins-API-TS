@@ -4,7 +4,7 @@ import type { Booking, UserRole } from "../generated/prisma/client.js";
 import { AppError } from "../utils/AppError.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
-import { getPricingLimits, currentSettings } from "./setting.store.js";
+import { getPricingLimits, currentSettings } from "../cache/setting.store.js";
 import { TIMEZONE } from "../constants/booking.constants.js";
 import { isValidStatusTransition, hasFullBookingAccess } from "../utils/booking.util.js";
 import { simulatePaymentGateway } from "../utils/payment.util.js";

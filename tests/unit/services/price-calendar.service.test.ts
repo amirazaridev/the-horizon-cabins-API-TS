@@ -3,7 +3,7 @@ import {
   getCalendarWindow,
   resolveAffectedCalendarRange,
 } from "../../../src/services/price-calendar.service.js";
-import { PRICING_LIMITS } from "../../../src/constants/pricing.constants.js";
+import { DEFAULT_PRICING_LIMITS } from "../../helpers/settings.js";
 import { addDaysUtc } from "../../../src/utils/date.util.js";
 import type { PricingRule } from "../../../src/types/pricing.types.js";
 
@@ -84,7 +84,7 @@ describe("getCalendarWindow", () => {
 
     expect(ymd(window.from)).toBe("2026-06-15");
     expect(ymd(window.to)).toBe(
-      ymd(addDaysUtc(window.from, PRICING_LIMITS.priceCalendarHorizonDays - 1)),
+      ymd(addDaysUtc(window.from, DEFAULT_PRICING_LIMITS.priceCalendarHorizonDays - 1)),
     );
   });
 });

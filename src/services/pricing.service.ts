@@ -3,7 +3,7 @@ import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { validateStayRange } from "../utils/booking-date.util.js";
 import { quoteStayPrice } from "../utils/pricing.engine.js";
-import { getPricingLimits, currentSettings } from "./setting.store.js";
+import { getPricingLimits, currentSettings } from "../cache/setting.store.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as bookingRepository from "../repositories/booking.repository.js";
 import * as priceRuleRepository from "../repositories/price-rule.repository.js";

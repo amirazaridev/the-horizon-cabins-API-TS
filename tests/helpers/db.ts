@@ -1,5 +1,5 @@
 import { prisma } from "../../src/config/database.js";
-import { resetSettingsCache } from "../../src/services/setting.store.js";
+import { resetSettingsCache } from "../../src/cache/setting.store.js";
 
 /**
  * پاک‌سازی دیتابیس بین تست‌ها.

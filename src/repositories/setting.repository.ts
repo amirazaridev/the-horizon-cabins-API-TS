@@ -1,5 +1,5 @@
 import { prisma, type PrismaTransactionClient } from "../config/database.js";
-import { DEFAULT_SETTINGS } from "../constants/settings.constants.js";
+import { DEFAULT_SETTINGS } from "../constants/setting.constants.js";
 import type { Setting } from "../generated/prisma/client.js";
 import type { SettingsColumns } from "../types/setting.types.js";
 

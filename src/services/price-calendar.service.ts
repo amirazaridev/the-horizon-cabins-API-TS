@@ -1,4 +1,4 @@
-import { currentSettings, getPricingLimits } from "./setting.store.js";
+import { currentSettings, getPricingLimits } from "../cache/setting.store.js";
 import { TIMEZONE } from "../constants/booking.constants.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { ErrorCode } from "../constants/errorCodes.js";

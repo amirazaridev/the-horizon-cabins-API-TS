@@ -11,7 +11,7 @@ import type { PaginatedResult } from "../types/pagination.types.js";
 import { CabinFilters, CabinWithPricing } from "../types/cabin.types.js";
 import { prisma } from "../config/database.js";
 import { rebuildCabinPriceCalendar } from "./price-calendar.service.js";
-import { currentSettings } from "./setting.store.js";
+import { currentSettings } from "../cache/setting.store.js";
 
 type GetAllCabinsParams = {
   skip?: number;

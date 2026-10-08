@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import type { ZodType } from "zod";
-import { currentSettings } from "../services/setting.store.js";
+import { currentSettings } from "../cache/setting.store.js";
 import type { AppSettings } from "../types/setting.types.js";
 
 export interface RequestValidationSchema {

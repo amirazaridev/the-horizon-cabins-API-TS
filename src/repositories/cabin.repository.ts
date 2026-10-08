@@ -7,7 +7,7 @@ import {
   findAllCabinsWithPricing,
   needsPricingPath,
 } from "./cabin-search.repository.js";
-import { DEFAULT_SETTINGS } from "../constants/settings.constants.js";
+import { DEFAULT_SETTINGS } from "../constants/setting.constants.js";
 
 type Db = typeof prisma | PrismaTransactionClient;
 

@@ -1,4 +1,4 @@
-import { SETTINGS_FIELDS } from "../constants/settings.constants.js";
+import { SETTINGS_FIELDS } from "../constants/setting.constants.js";
 import type { SettingsColumns } from "../types/setting.types.js";
 
 /**

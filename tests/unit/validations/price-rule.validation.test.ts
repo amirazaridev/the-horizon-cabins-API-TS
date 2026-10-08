@@ -4,7 +4,7 @@ import {
   createCabinPriceRuleSchema,
   updatePriceRuleBodySchema,
 } from "../../../src/validations/price-rule.validation.js";
-import { currentSettings } from "../../../src/services/setting.store.js";
+import { currentSettings } from "../../../src/cache/setting.store.js";
 
 const dateRangeRule = {
   type: "discount",

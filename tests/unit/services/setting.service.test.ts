@@ -5,8 +5,9 @@ import * as cabinRepository from "../../../src/repositories/cabin.repository.js"
 import * as priceRuleRepository from "../../../src/repositories/price-rule.repository.js";
 import * as bookingRepository from "../../../src/repositories/booking.repository.js";
 import * as priceCalendarService from "../../../src/services/price-calendar.service.js";
-import { currentSettings, resetSettingsCache } from "../../../src/services/setting.store.js";
-import { DEFAULT_SETTINGS } from "../../../src/constants/settings.constants.js";
+import { currentSettings, resetSettingsCache } from "../../../src/cache/setting.store.js";
+import { assertConsistent } from "../../../src/validations/setting.validation.js";
+import { DEFAULT_SETTINGS } from "../../../src/constants/setting.constants.js";
 import { ErrorCode } from "../../../src/constants/errorCodes.js";
 import { HTTP_STATUS } from "../../../src/constants/httpStatus.js";
 import type { SettingsColumns } from "../../../src/types/setting.types.js";
@@ -129,32 +130,32 @@ describe("setting.service", () => {
     const base = { ...DEFAULT_SETTINGS };
 
     it("accepts the defaults", () => {
-      expect(() => settingService.assertConsistent(base)).not.toThrow();
+      expect(() => assertConsistent(base)).not.toThrow();
     });
 
     it("rejects maxBookingLength below minBookingLength", () => {
-      expect(() => settingService.assertConsistent({ ...base, maxBookingLength: 0 })).toThrow(
+      expect(() => assertConsistent({ ...base, maxBookingLength: 0 })).toThrow(
         /maxBookingLength must be greater than or equal to minBookingLength/,
       );
     });
 
     it("rejects startingPriceWindowDays above maxAdvanceBookingDays", () => {
       expect(() =>
-        settingService.assertConsistent({ ...base, startingPriceWindowDays: 200 }),
+        assertConsistent({ ...base, startingPriceWindowDays: 200 }),
       ).toThrow(/startingPriceWindowDays cannot exceed maxAdvanceBookingDays/);
     });
 
     it("rejects maxRegularPrice above the derived maximum", () => {
       expect(() =>
-        settingService.assertConsistent({ ...base, maxRegularPrice: 36_000_000 }),
+        assertConsistent({ ...base, maxRegularPrice: 36_000_000 }),
       ).toThrow(/derived from maxNightlyPrice/);
     });
 
     it("allows 30 nights with the defaults but rejects 31 (int4 overflow)", () => {
       expect(() =>
-        settingService.assertConsistent({ ...base, maxBookingLength: 30 }),
+        assertConsistent({ ...base, maxBookingLength: 30 }),
       ).not.toThrow();
-      expect(() => settingService.assertConsistent({ ...base, maxBookingLength: 31 })).toThrow(
+      expect(() => assertConsistent({ ...base, maxBookingLength: 31 })).toThrow(
         /exceeds the maximum integer/,
       );
     });

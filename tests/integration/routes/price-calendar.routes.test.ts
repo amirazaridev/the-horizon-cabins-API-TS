@@ -8,7 +8,7 @@ import { cookieFor } from "../../helpers/auth.js";
 import { prisma } from "../../../src/config/database.js";
 import { addDaysUtc, todayInTimezone } from "../../../src/utils/date.util.js";
 import { TIMEZONE } from "../../../src/constants/booking.constants.js";
-import { PRICE_CALENDAR_HORIZON_DAYS } from "../../../src/constants/pricing.constants.js";
+import { DEFAULT_SETTINGS } from "../../../src/constants/setting.constants.js";
 
 const ctx = useIntegrationDb();
 void ctx;
@@ -44,7 +44,7 @@ describe.skipIf(!isIntegrationDbAvailable())("price-calendar.routes (integration
       const res = await request(app).get(calendarPath());
 
       expect(res.status).toBe(200);
-      expect(res.body.data.calendar.days).toHaveLength(PRICE_CALENDAR_HORIZON_DAYS);
+      expect(res.body.data.calendar.days).toHaveLength(DEFAULT_SETTINGS.maxAdvanceBookingDays);
       expect(res.body.data.calendar.days[0].date).toBe(`${ymd(today())}T00:00:00.000Z`);
     });
 
@@ -86,7 +86,7 @@ describe.skipIf(!isIntegrationDbAvailable())("price-calendar.routes (integration
       expect(res.status).toBe(400);
       expect(res.body.code).toBe("PRICE_CALENDAR_RANGE_INVALID");
 
-      const after = ymd(addDaysUtc(today(), PRICE_CALENDAR_HORIZON_DAYS + 5));
+      const after = ymd(addDaysUtc(today(), DEFAULT_SETTINGS.maxAdvanceBookingDays + 5));
       const res2 = await request(app).get(`${calendarPath()}?to=${after}`);
       expect(res2.status).toBe(400);
       expect(res2.body.code).toBe("PRICE_CALENDAR_RANGE_INVALID");
@@ -131,7 +131,7 @@ describe.skipIf(!isIntegrationDbAvailable())("price-calendar.routes (integration
 
       expect(res.status).toBe(200);
       expect(res.body.data.cabinsRebuilt).toBe(1);
-      expect(res.body.data.rowsWritten).toBe(PRICE_CALENDAR_HORIZON_DAYS);
+      expect(res.body.data.rowsWritten).toBe(DEFAULT_SETTINGS.maxAdvanceBookingDays);
     });
 
     it("returns 404 for an unknown cabin", async () => {
@@ -152,7 +152,7 @@ describe.skipIf(!isIntegrationDbAvailable())("price-calendar.routes (integration
 
       expect(res.status).toBe(200);
       expect(res.body.data.cabinsRebuilt).toBe(2);
-      expect(res.body.data.rowsWritten).toBe(PRICE_CALENDAR_HORIZON_DAYS * 2);
+      expect(res.body.data.rowsWritten).toBe(DEFAULT_SETTINGS.maxAdvanceBookingDays * 2);
     });
   });
 });
