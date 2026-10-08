@@ -7,12 +7,15 @@ import { BOOKING_ADMIN_ROLES } from "../constants/booking.constants.js";
 
 const router = Router();
 
-//? خواندن و ویرایش تنظیمات فقط برای admin|owner.
-router.use(protect, restrictTo(...BOOKING_ADMIN_ROLES));
+router.use(protect);
 
-router
-  .route("/")
-  .get(settingController.getSettings)
-  .patch(validate(updateSettingsSchema), settingController.updateSettings);
+//? خواندن تنظیمات برای admin|owner؛ ویرایش فقط برای owner.
+router.get("/", restrictTo(...BOOKING_ADMIN_ROLES), settingController.getSettings);
+router.patch(
+  "/",
+  restrictTo("owner"),
+  validate(updateSettingsSchema),
+  settingController.updateSettings,
+);
 
 export default router;

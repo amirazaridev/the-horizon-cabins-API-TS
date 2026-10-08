@@ -52,7 +52,7 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
       );
     });
 
-    it("PATCH /settings is admin|owner only", async () => {
+    it("PATCH /settings is owner only (admin gets 403)", async () => {
       expect((await request(app).patch(SETTINGS_PATH).send({ maxGuests: 8 })).status).toBe(401);
       expect(
         (
@@ -69,7 +69,7 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
             .set("Cookie", cookieFor(admin))
             .send({ maxGuests: 8 })
         ).status,
-      ).toBe(200);
+      ).toBe(403);
       expect(
         (
           await request(app)
@@ -107,11 +107,11 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
     it("persists a partial update and reflects it on the next GET", async () => {
       await request(app)
         .patch(SETTINGS_PATH)
-        .set("Cookie", cookieFor(admin))
+        .set("Cookie", cookieFor(owner))
         .send({ maxBookingLength: 20, paymentDeadlineMinutes: 45 })
         .expect(200);
 
-      const res = await request(app).get(SETTINGS_PATH).set("Cookie", cookieFor(owner));
+      const res = await request(app).get(SETTINGS_PATH).set("Cookie", cookieFor(admin));
       expect(res.body.data.settings).toMatchObject({
         maxBookingLength: 20,
         paymentDeadlineMinutes: 45,
@@ -122,14 +122,17 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
     });
 
     it("rejects an empty body", async () => {
-      const res = await request(app).patch(SETTINGS_PATH).set("Cookie", cookieFor(admin)).send({});
+      const res = await request(app)
+        .patch(SETTINGS_PATH)
+        .set("Cookie", cookieFor(owner))
+        .send({});
       expect(res.status).toBe(400);
     });
 
     it("rejects unknown keys (strict)", async () => {
       const res = await request(app)
         .patch(SETTINGS_PATH)
-        .set("Cookie", cookieFor(admin))
+        .set("Cookie", cookieFor(owner))
         .send({ breakfastPrice: 10 });
       expect(res.status).toBe(400);
     });
@@ -138,7 +141,7 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
       // min=31 از اعتبارسنجی فیلد می‌گذرد ولی با max=30 ناسازگار است.
       const res = await request(app)
         .patch(SETTINGS_PATH)
-        .set("Cookie", cookieFor(admin))
+        .set("Cookie", cookieFor(owner))
         .send({ minBookingLength: 31 });
 
       expect(res.status).toBe(400);
@@ -155,7 +158,7 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
 
       await request(app)
         .patch(SETTINGS_PATH)
-        .set("Cookie", cookieFor(admin))
+        .set("Cookie", cookieFor(owner))
         .send({ maxBookingLength: 1 })
         .expect(200);
 
@@ -180,7 +183,7 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
 
       const res = await request(app)
         .patch(SETTINGS_PATH)
-        .set("Cookie", cookieFor(admin))
+        .set("Cookie", cookieFor(owner))
         .send({ maxTotalDiscountPercent: 40 });
 
       expect(res.status).toBe(200);
@@ -194,7 +197,7 @@ describe.skipIf(!isIntegrationDbAvailable())("setting.routes (integration)", () 
 
       const res = await request(app)
         .patch(SETTINGS_PATH)
-        .set("Cookie", cookieFor(admin))
+        .set("Cookie", cookieFor(owner))
         .send({ maxGuests: 12 });
 
       expect(res.status).toBe(200);
