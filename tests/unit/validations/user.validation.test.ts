@@ -1,0 +1,125 @@
+import { describe, it, expect } from "vitest";
+import { updateProfileSchema } from "../../../src/validations/user.validation.js";
+
+/** استخراج پیام‌های خطا از نتیجه‌ی safeParse برای assert راحت‌تر. */
+function issues(result: { success: boolean; error?: { issues: unknown[] } }) {
+  return result.success
+    ? []
+    : (result.error!.issues as Array<{ path: unknown[]; message: string }>);
+}
+
+const validBody = {
+  fullName: "علی رضایی",
+  phoneNumber: "09123456789",
+  nationalId: "1234567890",
+  dateOfBirth: "1991-08-03",
+};
+
+describe("user.validation — updateProfileSchema", () => {
+  it("should accept a fully valid body and transform dateOfBirth to a UTC midnight Date", () => {
+    const result = updateProfileSchema.body.safeParse(validBody);
+
+    expect(result.success).toBe(true);
+    expect(result.data!.fullName).toBe("علی رضایی");
+    expect(result.data!.phoneNumber).toBe("09123456789");
+    expect(result.data!.nationalId).toBe("1234567890");
+    expect(result.data!.dateOfBirth?.toISOString()).toBe("1991-08-03T00:00:00.000Z");
+  });
+
+  it("should treat absent optional fields as undefined so a partial PATCH leaves them untouched", () => {
+    const result = updateProfileSchema.body.safeParse({ fullName: "علی رضایی" });
+
+    expect(result.success).toBe(true);
+    expect(result.data!.phoneNumber).toBeUndefined();
+    expect(result.data!.nationalId).toBeUndefined();
+    expect(result.data!.dateOfBirth).toBeUndefined();
+    expect(result.data!.gender).toBeUndefined();
+  });
+
+  it("should normalize empty strings and null to null (clear the value)", () => {
+    const result = updateProfileSchema.body.safeParse({
+      fullName: "علی رضایی",
+      phoneNumber: "",
+      nationalId: null,
+      dateOfBirth: "",
+      gender: null,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data!.phoneNumber).toBeNull();
+    expect(result.data!.nationalId).toBeNull();
+    expect(result.data!.dateOfBirth).toBeNull();
+    expect(result.data!.gender).toBeNull();
+  });
+
+  it("should reject a full name shorter than 3 characters", () => {
+    const result = updateProfileSchema.body.safeParse({ fullName: "ab" });
+    expect(result.success).toBe(false);
+    expect(issues(result).some((i) => i.path[0] === "fullName")).toBe(true);
+  });
+
+  it("should reject an invalid phone number", () => {
+    const result = updateProfileSchema.body.safeParse({
+      fullName: "علی رضایی",
+      phoneNumber: "0812345678",
+    });
+    expect(result.success).toBe(false);
+    expect(issues(result).some((i) => i.path[0] === "phoneNumber")).toBe(true);
+  });
+
+  it("should reject a national ID that is not exactly 10 digits", () => {
+    const result = updateProfileSchema.body.safeParse({
+      fullName: "علی رضایی",
+      nationalId: "12345",
+    });
+    expect(result.success).toBe(false);
+    expect(issues(result).some((i) => i.path[0] === "nationalId")).toBe(true);
+  });
+
+  it("should reject a non-existent calendar date (1991-02-30)", () => {
+    const result = updateProfileSchema.body.safeParse({
+      fullName: "علی رضایی",
+      dateOfBirth: "1991-02-30",
+    });
+    expect(result.success).toBe(false);
+    expect(issues(result).some((i) => i.path[0] === "dateOfBirth")).toBe(true);
+  });
+
+  it("should reject a malformed date of birth", () => {
+    const result = updateProfileSchema.body.safeParse({
+      fullName: "علی رضایی",
+      dateOfBirth: "03/08/1991",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject an unknown gender value", () => {
+    const result = updateProfileSchema.body.safeParse({
+      fullName: "علی رضایی",
+      gender: "other",
+    });
+    expect(result.success).toBe(false);
+    expect(issues(result).some((i) => i.path[0] === "gender")).toBe(true);
+  });
+
+  it("should accept a valid gender value", () => {
+    const result = updateProfileSchema.body.safeParse({
+      fullName: "علی رضایی",
+      gender: "female",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data!.gender).toBe("female");
+  });
+
+  it("should ignore unknown fields such as email/role (no mass assignment)", () => {
+    const result = updateProfileSchema.body.safeParse({
+      fullName: "علی رضایی",
+      email: "hacker@evil.com",
+      role: "admin",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data).not.toHaveProperty("email");
+    expect(result.data).not.toHaveProperty("role");
+  });
+});

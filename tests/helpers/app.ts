@@ -17,3 +17,4 @@ export function getTestApp(): Express {
 /** مسیر پایه‌ی API (هم‌راستا با routes/index.ts). */
 export const API_BASE = "/api/v1";
 export const BOOKINGS_PATH = `${API_BASE}/bookings`;
+export const USER_ME_PATH = `${API_BASE}/user/me`;
