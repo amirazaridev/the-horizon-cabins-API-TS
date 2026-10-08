@@ -1,4 +1,4 @@
-import { getPricingLimits, PRICING_LIMITS } from "../constants/pricing.constants.js";
+import { currentSettings, getPricingLimits } from "./setting.store.js";
 import { TIMEZONE } from "../constants/booking.constants.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { ErrorCode } from "../constants/errorCodes.js";
@@ -23,7 +23,7 @@ export function getCalendarWindow(now: Date = new Date()): DateRange {
   const today = todayInTimezone(TIMEZONE, now);
   return {
     from: today,
-    to: addDaysUtc(today, PRICING_LIMITS.priceCalendarHorizonDays - 1),
+    to: addDaysUtc(today, currentSettings().priceCalendarHorizonDays - 1),
   };
 }
 
@@ -81,7 +81,7 @@ async function buildCalendarRows(
   rules: PricingRule[],
   range: DateRange,
 ): Promise<calendarRepository.CabinDailyPriceRow[]> {
-  const limits = await getPricingLimits();
+  const limits = getPricingLimits();
   const numDays = nightsBetween(range.from, range.to) + 1;
   const rows: calendarRepository.CabinDailyPriceRow[] = [];
   let anyExceeded = false;
@@ -309,7 +309,7 @@ export async function getCabinPriceCalendar(
     });
 
     const rules = await priceRuleRepository.findActiveRulesForCabin(cabinId);
-    const limits = await getPricingLimits();
+    const limits = getPricingLimits();
     computedMissing = new Map();
 
     for (let i = 0; i < expectedDays; i += 1) {

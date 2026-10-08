@@ -3,7 +3,7 @@ import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { validateStayRange } from "../utils/booking-date.util.js";
 import { quoteStayPrice } from "../utils/pricing.engine.js";
-import { getPricingLimits } from "../constants/pricing.constants.js";
+import { getPricingLimits, currentSettings } from "./setting.store.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as bookingRepository from "../repositories/booking.repository.js";
 import * as priceRuleRepository from "../repositories/price-rule.repository.js";
@@ -34,14 +34,14 @@ export async function getPriceQuote(
   available: boolean;
 }> {
   const now = new Date();
-  const { startDate, endDate } = validateStayRange(range, now);
+  const { startDate, endDate } = validateStayRange(range, currentSettings(), now);
 
   const cabin = await cabinRepository.findCabinById(cabinId);
   if (!cabin) {
     throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
   }
 
-  const limits = await getPricingLimits();
+  const limits = getPricingLimits();
   const activeRules = await priceRuleRepository.findActiveRulesForCabin(cabinId);
 
   const quote = quoteStayPrice(cabin.regularPrice, activeRules, startDate, endDate, limits);

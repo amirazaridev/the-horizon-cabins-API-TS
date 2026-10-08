@@ -1,8 +1,9 @@
 import { BOOKING_CONSTANTS } from "./booking.constants.js";
 import type { PricingLimits } from "../types/pricing.types.js";
 
-
-//TODO: منتقل کردن getPricingLimits به جدول Setting
+//* سقف‌های قابل‌تنظیم در جدول `Setting` نگهداری می‌شوند و در runtime از
+//* `services/setting.store` خوانده می‌شوند. مقادیر این فایل صرفاً پیش‌فرض‌های
+//* دامنه‌اند (منبع DEFAULT_SETTINGS) و در تست‌ها به‌عنوان مرجع استفاده می‌شوند.
 
 export const MAX_DISCOUNTS_PER_NIGHT = 2;
 export const MAX_SURCHARGES_PER_NIGHT = 2;
@@ -25,7 +26,7 @@ export const MAX_REGULAR_PRICE = Math.floor(
 //* از ۳۶۵ به ۱۲۰ روز کاهش می‌یابد
 export const MAX_ADVANCE_BOOKING_DAYS = BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS;
 
-//*  تقویم قیمت =  رزرو. 
+//*  تقویم قیمت =  رزرو.
 export const PRICE_CALENDAR_HORIZON_DAYS = MAX_ADVANCE_BOOKING_DAYS;
 
 //* پنجره‌ی محاسبه‌ی startingPrice برای لیست کابین‌ها. (Filter)
@@ -34,7 +35,7 @@ export const STARTING_PRICE_WINDOW_DAYS = 30;
 //* حداکثر فاصله‌ی endDate قانون dateRange از امروز.
 export const PRICE_RULE_MAX_FUTURE_DAYS = 365;
 
-//* حداکثر تعداد شب هر رزرو 
+//* حداکثر تعداد شب هر رزرو
 export const MAX_BOOKING_LENGTH_NIGHTS = BOOKING_CONSTANTS.MAX_BOOKING_LENGTH_NIGHTS;
 
 export const PRICING_LIMITS: PricingLimits = Object.freeze({
@@ -50,8 +51,3 @@ export const PRICING_LIMITS: PricingLimits = Object.freeze({
   startingPriceWindowDays: STARTING_PRICE_WINDOW_DAYS,
   priceRuleMaxFutureDays: PRICE_RULE_MAX_FUTURE_DAYS,
 });
-
-
-export async function getPricingLimits(): Promise<PricingLimits> {
-  return { ...PRICING_LIMITS };
-}

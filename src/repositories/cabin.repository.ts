@@ -7,6 +7,7 @@ import {
   findAllCabinsWithPricing,
   needsPricingPath,
 } from "./cabin-search.repository.js";
+import { DEFAULT_SETTINGS } from "../constants/settings.constants.js";
 
 type Db = typeof prisma | PrismaTransactionClient;
 
@@ -15,6 +16,8 @@ interface FindAllCabinsParams {
   limit?: number;
   categorySlug?: string;
   filters?: CabinFilters;
+  /** پنجره‌ی startingPrice؛ پیش‌فرض از مقادیر پیش‌فرض تنظیمات. */
+  startingPriceWindowDays?: number;
 }
 
 function buildWhereClause(categorySlug?: string, filters?: CabinFilters): Prisma.CabinWhereInput {
@@ -63,11 +66,18 @@ export async function findAllCabins({
   limit = 10,
   categorySlug,
   filters,
+  startingPriceWindowDays = DEFAULT_SETTINGS.startingPriceWindowDays,
 }: FindAllCabinsParams = {}) {
   const where = buildWhereClause(categorySlug, filters);
 
   if (needsPricingPath(filters)) {
-    return findAllCabinsWithPricing({ where, skip, limit, filters: filters! });
+    return findAllCabinsWithPricing({
+      where,
+      skip,
+      limit,
+      filters: filters!,
+      startingPriceWindowDays,
+    });
   }
 
   const [data, total] = await Promise.all([
@@ -81,7 +91,7 @@ export async function findAllCabins({
   ]);
 
   //* مسیر بدون پارامتر قیمت: startingPrice را با یک کوئری گروهی اضافه می‌کنیم.
-  const enriched = await enrichWithStartingPrice(data as CabinWithCity[]);
+  const enriched = await enrichWithStartingPrice(data as CabinWithCity[], startingPriceWindowDays);
   return { data: enriched, total };
 }
 
