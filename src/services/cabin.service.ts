@@ -2,8 +2,7 @@ import { AppError } from "../utils/AppError.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as categoryRepository from "../repositories/category.repository.js";
 import type { Cabin, Category } from "../generated/prisma/client.js";
-import type { z } from "zod";
-import type { createCabinSchema, updateCabinSchema } from "../validations/cabin.validation.js";
+import type { CreateCabinInput, UpdateCabinInput } from "../validations/cabin.validation.js";
 import { extractFilePath, removeUploadedImages, uploadCabinImages } from "../utils/upload.utils.js";
 import { getPaginationMeta } from "../utils/pagination.utils.js";
 import { ErrorCode } from "../constants/errorCodes.js";
@@ -12,9 +11,7 @@ import type { PaginatedResult } from "../types/pagination.types.js";
 import { CabinFilters, CabinWithPricing } from "../types/cabin.types.js";
 import { prisma } from "../config/database.js";
 import { rebuildCabinPriceCalendar } from "./price-calendar.service.js";
-
-type CreateCabinInput = z.infer<typeof createCabinSchema.body>;
-type UpdateCabinInput = z.infer<typeof updateCabinSchema.body>;
+import { currentSettings } from "../cache/setting.store.js";
 
 type GetAllCabinsParams = {
   skip?: number;
@@ -33,6 +30,7 @@ export async function getAllCabins(
     limit,
     categorySlug,
     filters,
+    startingPriceWindowDays: currentSettings().startingPriceWindowDays,
   });
   return {
     data,

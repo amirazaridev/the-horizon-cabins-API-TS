@@ -1,12 +1,10 @@
 import cron from "node-cron";
-import { getBookingSettings } from "../constants/booking.constants.js";
+import { BOOKING_EXPIRATION_CRON } from "../constants/booking.constants.js";
 import { expirePendingBookings } from "../services/booking.service.js";
 import logger from "../config/logger.js";
 
 export function startBookingExpirationJob(): void {
-  const settings = getBookingSettings();
-
-  cron.schedule(settings.expirationCheckCron, async () => {
+  cron.schedule(BOOKING_EXPIRATION_CRON, async () => {
     try {
       const expiredCount = await expirePendingBookings();
       if (expiredCount > 0) {

@@ -6,11 +6,7 @@ import { AppError } from "../utils/AppError.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { TIMEZONE } from "../constants/booking.constants.js";
-import {
-  MAX_TOTAL_DISCOUNT_PERCENT,
-  MAX_TOTAL_SURCHARGE_PERCENT,
-  getPricingLimits,
-} from "../constants/pricing.constants.js";
+import { getPricingLimits } from "../cache/setting.store.js";
 import { addDaysUtc, todayInTimezone } from "../utils/date.util.js";
 import { validateRuleSet } from "../utils/pricing.engine.js";
 import { withSerializableRetry } from "../utils/transaction.util.js";
@@ -22,18 +18,22 @@ import {
   rebuildCabinPriceCalendarStandalone,
   resolveAffectedCalendarRange,
 } from "./price-calendar.service.js";
-import type { PricingRule, RuleLimitViolation, RuleType } from "../types/pricing.types.js";
-import { auditSnapshot, toPricingRule, ymd } from "../mappers/price-rule.mapper.js";
-import type { z } from "zod";
 import type {
-  bulkCreatePriceRulesBodySchema,
-  createPriceRuleBodySchema,
-  updatePriceRuleBodySchema,
+  PricingLimits,
+  PricingRule,
+  RuleLimitViolation,
+  RuleType,
+} from "../types/pricing.types.js";
+import { auditSnapshot, toPricingRule, ymd } from "../mappers/price-rule.mapper.js";
+import type {
+  BulkCreatePriceRulesInput,
+  CreatePriceRuleInput,
+  UpdatePriceRuleInput,
 } from "../validations/price-rule.validation.js";
 
-type CreateRuleInput = z.infer<typeof createPriceRuleBodySchema>;
-type UpdateRuleInput = z.infer<typeof updatePriceRuleBodySchema>;
-type BulkInput = z.infer<typeof bulkCreatePriceRulesBodySchema>;
+type CreateRuleInput = CreatePriceRuleInput;
+type UpdateRuleInput = UpdatePriceRuleInput;
+type BulkInput = BulkCreatePriceRulesInput;
 
 function formatViolation(violation: RuleLimitViolation) {
   return {
@@ -60,8 +60,9 @@ function invalidRule(message: string): AppError {
   return new AppError(message, HTTP_STATUS.BAD_REQUEST, ErrorCode.PRICE_RULE_INVALID);
 }
 
-function assertPercentWithinCap(type: RuleType, percent: number): void {
-  const cap = type === "discount" ? MAX_TOTAL_DISCOUNT_PERCENT : MAX_TOTAL_SURCHARGE_PERCENT;
+function assertPercentWithinCap(type: RuleType, percent: number, limits: PricingLimits): void {
+  const cap =
+    type === "discount" ? limits.maxTotalDiscountPercent : limits.maxTotalSurchargePercent;
   if (percent > cap) {
     throw invalidRule(`percent cannot exceed ${cap} for a ${type} rule`);
   }
@@ -133,7 +134,7 @@ export async function createRule(
 ): Promise<PriceRule> {
   const now = new Date();
   const today = todayInTimezone(TIMEZONE, now);
-  const limits = await getPricingLimits();
+  const limits = getPricingLimits();
   const isActive = input.isActive ?? true;
 
   assertEndDateWithinRange(
@@ -241,7 +242,7 @@ export async function updateRule(
 ): Promise<PriceRule> {
   const now = new Date();
   const today = todayInTimezone(TIMEZONE, now);
-  const limits = await getPricingLimits();
+  const limits = getPricingLimits();
 
   return withSerializableRetry(() =>
     prisma.$transaction(
@@ -259,7 +260,7 @@ export async function updateRule(
         if (!locked) throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
 
         assertUpdateShapeMatchesKind(existing, input);
-        if (input.percent !== undefined) assertPercentWithinCap(existing.type, input.percent);
+        if (input.percent !== undefined) assertPercentWithinCap(existing.type, input.percent, limits);
 
         const merged = mergeRuleUpdate(existing, input);
 
@@ -409,7 +410,7 @@ const REBUILD_CONCURRENCY = 4;
 export async function bulkCreateRules(input: BulkInput, actorId: number): Promise<BulkResult> {
   const now = new Date();
   const today = todayInTimezone(TIMEZONE, now);
-  const limits = await getPricingLimits();
+  const limits = getPricingLimits();
   const rule = input.rule;
   const isActive = rule.isActive ?? true;
 

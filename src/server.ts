@@ -4,6 +4,7 @@ import env from "./config/env.js";
 import logger from "./config/logger.js";
 import { startOtpCleanupJob } from "./jobs/otp-cleanup.job.js";
 import { startPriceCalendarJob } from "./jobs/price-calendar.job.js";
+import { refreshSettings } from "./cache/setting.store.js";
 /* eslint-disable n/no-process-exit */
 async function startServer(): Promise<void> {
   const app = createApp();
@@ -12,6 +13,9 @@ async function startServer(): Promise<void> {
     logger.error("Failed to connect to database. Server not started.");
     process.exit(1);
   }
+
+  //* تنظیمات مؤثر را یک‌بار از DB بارگذاری می‌کنیم تا مسیرهای داغ sync بمانند.
+  await refreshSettings();
 
   // جاب‌های دوره‌ای — بعد از اطمینان از اتصال دیتابیس.
   startOtpCleanupJob();

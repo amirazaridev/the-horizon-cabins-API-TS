@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
-  bulkCreatePriceRulesBodySchema,
-  createPriceRuleBodySchema,
+  bulkCreatePriceRulesSchema,
+  createCabinPriceRuleSchema,
   updatePriceRuleBodySchema,
 } from "../../../src/validations/price-rule.validation.js";
+import { currentSettings } from "../../../src/cache/setting.store.js";
 
 const dateRangeRule = {
   type: "discount",
@@ -23,17 +24,19 @@ const weekdayRule = {
 describe("price-rule.validation", () => {
   describe("createPriceRuleBodySchema", () => {
     it("accepts a valid dateRange rule and parses dates to UTC midnight", () => {
-      const result = createPriceRuleBodySchema.parse(dateRangeRule);
+      const result = createCabinPriceRuleSchema(currentSettings()).body.parse(dateRangeRule);
       expect(result.startDate?.toISOString()).toBe("2026-06-05T00:00:00.000Z");
       expect(result.endDate?.toISOString()).toBe("2026-06-10T00:00:00.000Z");
     });
 
     it("accepts a valid weekday rule", () => {
-      expect(createPriceRuleBodySchema.parse(weekdayRule).weekdays).toEqual([3, 4, 5]);
+      expect(
+        createCabinPriceRuleSchema(currentSettings()).body.parse(weekdayRule).weekdays,
+      ).toEqual([3, 4, 5]);
     });
 
     it("coerces numeric strings for percent and weekdays", () => {
-      const result = createPriceRuleBodySchema.parse({
+      const result = createCabinPriceRuleSchema(currentSettings()).body.parse({
         ...weekdayRule,
         percent: "15",
         weekdays: ["3", "4"],
@@ -44,78 +47,125 @@ describe("price-rule.validation", () => {
 
     it("requires startDate/endDate for a dateRange rule", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ type: "discount", kind: "dateRange", percent: 10 }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          type: "discount",
+          kind: "dateRange",
+          percent: 10,
+        }),
       ).toThrow(/startDate is required/);
     });
 
     it("rejects weekdays on a dateRange rule", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ ...dateRangeRule, weekdays: [3] }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          ...dateRangeRule,
+          weekdays: [3],
+        }),
       ).toThrow(/weekdays must not be provided/);
     });
 
     it("requires weekdays for a weekday rule", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ type: "surcharge", kind: "weekday", percent: 10 }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          type: "surcharge",
+          kind: "weekday",
+          percent: 10,
+        }),
       ).toThrow(/weekdays is required/);
     });
 
     it("rejects dates on a weekday rule", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ ...weekdayRule, startDate: "2026-06-05" }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          ...weekdayRule,
+          startDate: "2026-06-05",
+        }),
       ).toThrow(/must not be provided/);
     });
 
     it("rejects startDate after endDate", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ ...dateRangeRule, startDate: "2026-06-11" }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          ...dateRangeRule,
+          startDate: "2026-06-11",
+        }),
       ).toThrow(/startDate must be before or equal to endDate/);
     });
 
     it("enforces the discount percent cap (50)", () => {
-      expect(() => createPriceRuleBodySchema.parse({ ...dateRangeRule, percent: 51 })).toThrow(
-        /cannot exceed 50/,
-      );
-      expect(() => createPriceRuleBodySchema.parse({ ...dateRangeRule, percent: 50 })).not.toThrow();
+      expect(() =>
+        createCabinPriceRuleSchema(currentSettings()).body.parse({ ...dateRangeRule, percent: 51 }),
+      ).toThrow(/cannot exceed 50/);
+      expect(() =>
+        createCabinPriceRuleSchema(currentSettings()).body.parse({ ...dateRangeRule, percent: 50 }),
+      ).not.toThrow();
     });
 
     it("enforces the surcharge percent cap (100)", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ ...weekdayRule, type: "surcharge", percent: 101 }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          ...weekdayRule,
+          type: "surcharge",
+          percent: 101,
+        }),
       ).toThrow(/cannot exceed 100/);
       expect(() =>
-        createPriceRuleBodySchema.parse({ ...weekdayRule, type: "surcharge", percent: 100 }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          ...weekdayRule,
+          type: "surcharge",
+          percent: 100,
+        }),
       ).not.toThrow();
     });
 
     it("rejects percent below 1 and non-integers", () => {
-      expect(() => createPriceRuleBodySchema.parse({ ...dateRangeRule, percent: 0 })).toThrow();
-      expect(() => createPriceRuleBodySchema.parse({ ...dateRangeRule, percent: 1.5 })).toThrow();
+      expect(() =>
+        createCabinPriceRuleSchema(currentSettings()).body.parse({ ...dateRangeRule, percent: 0 }),
+      ).toThrow();
+      expect(() =>
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          ...dateRangeRule,
+          percent: 1.5,
+        }),
+      ).toThrow();
     });
 
     it("rejects duplicate and out-of-range weekdays", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ ...weekdayRule, weekdays: [3, 3] }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          ...weekdayRule,
+          weekdays: [3, 3],
+        }),
       ).toThrow(/duplicates/);
-      expect(() => createPriceRuleBodySchema.parse({ ...weekdayRule, weekdays: [0] })).toThrow();
-      expect(() => createPriceRuleBodySchema.parse({ ...weekdayRule, weekdays: [8] })).toThrow();
+      expect(() =>
+        createCabinPriceRuleSchema(currentSettings()).body.parse({ ...weekdayRule, weekdays: [0] }),
+      ).toThrow();
+      expect(() =>
+        createCabinPriceRuleSchema(currentSettings()).body.parse({ ...weekdayRule, weekdays: [8] }),
+      ).toThrow();
     });
 
     it("rejects a label longer than 100 characters", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ ...dateRangeRule, label: "x".repeat(101) }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          ...dateRangeRule,
+          label: "x".repeat(101),
+        }),
       ).toThrow(/label/);
     });
 
     it("rejects unknown/immutable keys (strict)", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ ...dateRangeRule, cabinId: 1 }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({ ...dateRangeRule, cabinId: 1 }),
       ).toThrow();
     });
 
     it("rejects an invalid date format", () => {
       expect(() =>
-        createPriceRuleBodySchema.parse({ ...dateRangeRule, endDate: "2026-02-30" }),
+        createCabinPriceRuleSchema(currentSettings()).body.parse({
+          ...dateRangeRule,
+          endDate: "2026-02-30",
+        }),
       ).toThrow(/Invalid calendar date/);
     });
   });
@@ -142,25 +192,35 @@ describe("price-rule.validation", () => {
 
   describe("bulkCreatePriceRulesBodySchema", () => {
     it("accepts allCabins with a rule", () => {
-      const parsed = bulkCreatePriceRulesBodySchema.parse({ allCabins: true, rule: dateRangeRule });
+      const parsed = bulkCreatePriceRulesSchema(currentSettings()).body.parse({
+        allCabins: true,
+        rule: dateRangeRule,
+      });
       expect(parsed.allCabins).toBe(true);
     });
 
     it("accepts cabinIds with a rule", () => {
-      const parsed = bulkCreatePriceRulesBodySchema.parse({ cabinIds: [1, 2], rule: weekdayRule });
+      const parsed = bulkCreatePriceRulesSchema(currentSettings()).body.parse({
+        cabinIds: [1, 2],
+        rule: weekdayRule,
+      });
       expect(parsed.cabinIds).toEqual([1, 2]);
     });
 
     it("rejects when both cabinIds and allCabins are provided", () => {
       expect(() =>
-        bulkCreatePriceRulesBodySchema.parse({ cabinIds: [1], allCabins: true, rule: dateRangeRule }),
+        bulkCreatePriceRulesSchema(currentSettings()).body.parse({
+          cabinIds: [1],
+          allCabins: true,
+          rule: dateRangeRule,
+        }),
       ).toThrow(/Exactly one/);
     });
 
     it("rejects when neither is provided", () => {
-      expect(() => bulkCreatePriceRulesBodySchema.parse({ rule: dateRangeRule })).toThrow(
-        /Exactly one/,
-      );
+      expect(() =>
+        bulkCreatePriceRulesSchema(currentSettings()).body.parse({ rule: dateRangeRule }),
+      ).toThrow(/Exactly one/);
     });
   });
 });

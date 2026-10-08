@@ -8,7 +8,8 @@ import * as guestRepository from "../../../src/repositories/guest.repository.js"
 import * as priceRuleRepository from "../../../src/repositories/price-rule.repository.js";
 import { ErrorCode } from "../../../src/constants/errorCodes.js";
 import { HTTP_STATUS } from "../../../src/constants/httpStatus.js";
-import { BOOKING_CONSTANTS, TIMEZONE } from "../../../src/constants/booking.constants.js";
+import { TIMEZONE } from "../../../src/constants/booking.constants.js";
+import { DEFAULT_SETTINGS } from "../../../src/constants/setting.constants.js";
 import { AppError } from "../../../src/utils/AppError.js";
 import { addDaysUtc, todayInTimezone } from "../../../src/utils/date.util.js";
 import { utcDate } from "../../helpers/factories.js";
@@ -106,7 +107,7 @@ describe("booking.service", () => {
           totalPrice: 2_000_000,
           status: "pending",
           paymentDeadline: new Date(
-            NOW.getTime() + BOOKING_CONSTANTS.PAYMENT_DEADLINE_MINUTES * 60_000,
+            NOW.getTime() + DEFAULT_SETTINGS.paymentDeadlineMinutes * 60_000,
           ),
           cabin: { connect: { id: 1 } },
           guest: { connect: { id: 10 } },
@@ -218,7 +219,7 @@ describe("booking.service", () => {
     });
 
     it("should reject a start date beyond MAX_ADVANCE_BOOKING_DAYS", async () => {
-      const tooFar = addDaysUtc(TODAY, BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS + 1);
+      const tooFar = addDaysUtc(TODAY, DEFAULT_SETTINGS.maxAdvanceBookingDays + 1);
 
       await expect(
         bookingService.createBooking(
@@ -234,7 +235,7 @@ describe("booking.service", () => {
     it("should accept an end date exactly at MAX_ADVANCE_BOOKING_DAYS", async () => {
       //* قاعده‌ی افق روی endDate است: آخرین شب = today + 119؛ پس یک شب با
       //* endDate = today + 120 (شبِ today + 119) مجاز است.
-      const boundaryEnd = addDaysUtc(TODAY, BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS);
+      const boundaryEnd = addDaysUtc(TODAY, DEFAULT_SETTINGS.maxAdvanceBookingDays);
 
       await expect(
         bookingService.createBooking(
@@ -245,7 +246,7 @@ describe("booking.service", () => {
     });
 
     it("should reject an end date beyond MAX_ADVANCE_BOOKING_DAYS", async () => {
-      const tooFarEnd = addDaysUtc(TODAY, BOOKING_CONSTANTS.MAX_ADVANCE_BOOKING_DAYS + 1);
+      const tooFarEnd = addDaysUtc(TODAY, DEFAULT_SETTINGS.maxAdvanceBookingDays + 1);
 
       await expect(
         bookingService.createBooking(
@@ -335,7 +336,7 @@ describe("booking.service", () => {
 
     it("should reject when the guest reached the pending booking limit", async () => {
       vi.mocked(bookingRepository.countPendingBookingsForGuest).mockResolvedValue(
-        BOOKING_CONSTANTS.MAX_PENDING_BOOKINGS_PER_GUEST,
+        DEFAULT_SETTINGS.maxPendingBookingsPerGuest,
       );
 
       await expect(bookingService.createBooking(validInput, USER_ID)).rejects.toMatchObject({
@@ -940,7 +941,7 @@ describe("booking.service", () => {
       const [, range, now] = vi.mocked(bookingRepository.findBookedDateRanges).mock.calls[0];
       expect(range.from.getTime()).toBe(TODAY.getTime());
       expect(range.to.getTime()).toBe(
-        addDaysUtc(TODAY, BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS).getTime(),
+        addDaysUtc(TODAY, DEFAULT_SETTINGS.maxAdvanceBookingDays + 1).getTime(),
       );
       expect(now.getTime()).toBe(NOW.getTime());
     });
@@ -952,7 +953,7 @@ describe("booking.service", () => {
       const [, range] = vi.mocked(bookingRepository.findBookedDateRanges).mock.calls[0];
       expect(range.from.getTime()).toBe(from.getTime());
       expect(range.to.getTime()).toBe(
-        addDaysUtc(from, BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS).getTime(),
+        addDaysUtc(from, DEFAULT_SETTINGS.maxAdvanceBookingDays + 1).getTime(),
       );
     });
 
@@ -968,7 +969,7 @@ describe("booking.service", () => {
 
     it("should reject a range longer than the maximum", async () => {
       const from = utcDate("2030-01-01");
-      const to = addDaysUtc(from, BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS + 1);
+      const to = addDaysUtc(from, DEFAULT_SETTINGS.maxAdvanceBookingDays + 1 + 1);
 
       await expect(bookingService.getBookedDates(1, { from, to })).rejects.toMatchObject({
         statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -979,7 +980,7 @@ describe("booking.service", () => {
 
     it("should accept a range exactly at the maximum", async () => {
       const from = utcDate("2030-01-01");
-      const to = addDaysUtc(from, BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS);
+      const to = addDaysUtc(from, DEFAULT_SETTINGS.maxAdvanceBookingDays + 1);
 
       await expect(bookingService.getBookedDates(1, { from, to })).resolves.toEqual([]);
     });

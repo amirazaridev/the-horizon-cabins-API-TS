@@ -2,8 +2,8 @@ import { z } from "zod";
 import { safeNumber } from "../utils/safeParseNumber.js";
 import { paginationQueryValidation } from "./pagination.validation.js";
 import { BookingStatus } from "../generated/prisma/enums.js";
-import { BOOKING_CONSTANTS } from "../constants/booking.constants.js";
 import { cabinIdParamsSchema, dateOnlySchema, idParamsSchema } from "./shared.validation.js";
+import type { AppSettings } from "../types/setting.types.js";
 
 const DAY_MS = 86_400_000;
 
@@ -44,26 +44,28 @@ const updateStatusBodySchema = z.object({
   status: updatableBookingStatusSchema,
 });
 
-const bookedDatesQuerySchema = z
-  .object({
-    from: dateOnlySchema.optional(),
-    to: dateOnlySchema.optional(),
-  })
-  .refine((range) => !range.from || !range.to || range.from <= range.to, {
-    message: "from must be before or equal to to",
-    path: ["from"],
-  })
-  .refine(
-    (range) =>
-      !range.from ||
-      !range.to ||
-      (range.to.getTime() - range.from.getTime()) / DAY_MS <=
-        BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS,
-    {
-      message: `Date range cannot exceed ${BOOKING_CONSTANTS.BOOKED_DATES_MAX_RANGE_DAYS} days`,
-      path: ["to"],
-    },
-  );
+/** حداکثر بازه‌ی تاریخ‌های رزروشده از تنظیمات مؤثر می‌آید → factory. */
+function buildBookedDatesQuerySchema(settings: AppSettings) {
+  return z
+    .object({
+      from: dateOnlySchema.optional(),
+      to: dateOnlySchema.optional(),
+    })
+    .refine((range) => !range.from || !range.to || range.from <= range.to, {
+      message: "from must be before or equal to to",
+      path: ["from"],
+    })
+    .refine(
+      (range) =>
+        !range.from ||
+        !range.to ||
+        (range.to.getTime() - range.from.getTime()) / DAY_MS <= settings.bookedDatesMaxRangeDays,
+      {
+        message: `Date range cannot exceed ${settings.bookedDatesMaxRangeDays} days`,
+        path: ["to"],
+      },
+    );
+}
 
 export const createBookingSchema = { body: createBookingBodySchema };
 export const priceQuoteSchema = { params: cabinIdParamsSchema, query: priceQuoteQuerySchema };
@@ -72,4 +74,7 @@ export const getBookingSchema = { params: idParamsSchema };
 export const payBookingSchema = { params: idParamsSchema };
 export const cancelBookingSchema = { params: idParamsSchema };
 export const updateBookingStatusSchema = { params: idParamsSchema, body: updateStatusBodySchema };
-export const bookedDatesSchema = { params: cabinIdParamsSchema, query: bookedDatesQuerySchema };
+export const bookedDatesSchema = (settings: AppSettings) => ({
+  params: cabinIdParamsSchema,
+  query: buildBookedDatesQuerySchema(settings),
+});

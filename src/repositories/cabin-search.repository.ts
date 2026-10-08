@@ -2,7 +2,6 @@ import { prisma } from "../config/database.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { CabinFilters, CabinSort, CabinWithCity, CabinWithPricing } from "../types/cabin.types.js";
 import { OCCUPYING_STATUSES, BOOKING_STATUS_DB, TIMEZONE } from "../constants/booking.constants.js";
-import { PRICING_LIMITS } from "../constants/pricing.constants.js";
 import { addDaysUtc, nightsBetween, todayInTimezone } from "../utils/date.util.js";
 
 /**
@@ -45,8 +44,10 @@ export async function findAllCabinsWithPricing(params: {
   skip: number;
   limit: number;
   filters: CabinFilters;
+  /** پنجره‌ی محاسبه‌ی startingPrice — از تنظیمات مؤثر تزریق می‌شود. */
+  startingPriceWindowDays: number;
 }): Promise<{ data: CabinWithPricing[]; total: number }> {
-  const { where, skip, limit, filters } = params;
+  const { where, skip, limit, filters, startingPriceWindowDays } = params;
   const now = new Date();
   const today = todayInTimezone(TIMEZONE, now);
   const stayMode = filters.startDate !== undefined && filters.endDate !== undefined;
@@ -71,7 +72,15 @@ export async function findAllCabinsWithPricing(params: {
 
   const result = stayMode
     ? await queryStayPricing({ candidateIds, filters, now, skip, limit, orderByPrice })
-    : await queryStartingPrice({ candidateIds, filters, today, skip, limit, orderByPrice });
+    : await queryStartingPrice({
+        candidateIds,
+        filters,
+        today,
+        skip,
+        limit,
+        orderByPrice,
+        startingPriceWindowDays,
+      });
 
   if (result.rows.length === 0) return { data: [], total: result.total };
 
@@ -104,7 +113,7 @@ export async function findAllCabinsWithPricing(params: {
         pricing: {
           mode: "startingFrom",
           startingPrice: row.sortPrice,
-          windowDays: PRICING_LIMITS.startingPriceWindowDays,
+          windowDays: startingPriceWindowDays,
         },
       });
     }
@@ -187,9 +196,11 @@ async function queryStartingPrice(params: {
   skip: number;
   limit: number;
   orderByPrice: Prisma.Sql;
+  startingPriceWindowDays: number;
 }): Promise<{ rows: PricingRow[]; total: number }> {
-  const { candidateIds, filters, today, skip, limit, orderByPrice } = params;
-  const windowEnd = addDaysUtc(today, PRICING_LIMITS.startingPriceWindowDays - 1);
+  const { candidateIds, filters, today, skip, limit, orderByPrice, startingPriceWindowDays } =
+    params;
+  const windowEnd = addDaysUtc(today, startingPriceWindowDays - 1);
 
   //* فیلتر قیمت بدون تاریخ روی startingPrice.
   const priceFilter = filters.price
@@ -226,11 +237,12 @@ async function queryStartingPrice(params: {
  */
 export async function enrichWithStartingPrice(
   cabins: CabinWithCity[],
+  startingPriceWindowDays: number,
 ): Promise<CabinWithPricing[]> {
   if (cabins.length === 0) return [];
 
   const today = todayInTimezone(TIMEZONE);
-  const windowEnd = addDaysUtc(today, PRICING_LIMITS.startingPriceWindowDays - 1);
+  const windowEnd = addDaysUtc(today, startingPriceWindowDays - 1);
   const ids = cabins.map((cabin) => cabin.id);
 
   const rows = await prisma.$queryRaw<{ id: number; startingPrice: number | null }[]>(Prisma.sql`
@@ -249,7 +261,7 @@ export async function enrichWithStartingPrice(
     pricing: {
       mode: "startingFrom" as const,
       startingPrice: priceById.get(cabin.id) ?? null,
-      windowDays: PRICING_LIMITS.startingPriceWindowDays,
+      windowDays: startingPriceWindowDays,
     },
   }));
 }

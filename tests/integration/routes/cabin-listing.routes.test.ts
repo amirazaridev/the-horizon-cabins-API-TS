@@ -13,7 +13,7 @@ import { getTestApp, API_BASE } from "../../helpers/app.js";
 import { prisma } from "../../../src/config/database.js";
 import { addDaysUtc, todayInTimezone } from "../../../src/utils/date.util.js";
 import { TIMEZONE } from "../../../src/constants/booking.constants.js";
-import { PRICING_LIMITS } from "../../../src/constants/pricing.constants.js";
+import { DEFAULT_PRICING_LIMITS } from "../../helpers/settings.js";
 
 const ctx = useIntegrationDb();
 void ctx;
@@ -33,7 +33,7 @@ async function cabinWithFlatPrice(nightlyPrice: number) {
   const cabin = await createCabin({ regularPrice: nightlyPrice });
   const today = todayInTimezone(TIMEZONE);
   const rows = [];
-  for (let i = 0; i < PRICING_LIMITS.priceCalendarHorizonDays; i += 1) {
+  for (let i = 0; i < DEFAULT_PRICING_LIMITS.priceCalendarHorizonDays; i += 1) {
     rows.push({ date: addDaysUtc(today, i), price: nightlyPrice });
   }
   for (const row of rows) {
@@ -70,7 +70,7 @@ describe.skipIf(!isIntegrationDbAvailable())("cabin listing pricing (integration
       expect(found.pricing).toEqual({
         mode: "startingFrom",
         startingPrice: 2_000_000,
-        windowDays: PRICING_LIMITS.startingPriceWindowDays,
+        windowDays: DEFAULT_PRICING_LIMITS.startingPriceWindowDays,
       });
       expect(found).not.toHaveProperty("discount");
     });

@@ -35,8 +35,8 @@ enum BookingStatus {
   pending     // تازه ساخته شده، منتظر پرداخته
   confirmed   // پرداخت انجام شده
   cancelled   // یا timeout خورده یا خود کاربر/ادمین لغو کرده
-  checkedIn   @map("checked-in")
-  checkedOut  @map("checked-out")
+  checkedIn   @map("checked_in")
+  checkedOut  @map("checked_out")
 
   @@map("booking_status")
 }
@@ -100,7 +100,7 @@ enum OtpStatus {
 
 model User {
   id                 Int       @id @default(autoincrement())
-  email              String    @unique @db.VarChar(100)
+  email              String    @unique @db.VarChar(254)
   active             Boolean   @default(true)
   password           String    @db.VarChar(255)
   role               UserRole  @default(guest)
@@ -172,7 +172,7 @@ model City {
 
 model Cabin {
   id           Int      @id @default(autoincrement())
-  name         String   @unique
+  name         String   @unique @db.VarChar(100)
   maxCapacity  Int      @map("max_capacity")
   regularPrice Int      @map("regular_price")
   description  String
@@ -196,6 +196,7 @@ model Cabin {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([cityId])
   @@map("cabins")
 }
 
@@ -222,6 +223,7 @@ model CabinCategory {
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@id([cabinId, categoryId])
+  @@index([categoryId])
   @@map("cabin_categories")
 }
 
@@ -257,16 +259,39 @@ model Booking {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([cabinId, startDate, endDate])
+  @@index([guestId])
   @@index([status, paymentDeadline])
   @@map("bookings")
 }
 
+/// تنظیمات سراسری برنامه (تک‌ردیفی، id=1).
+///
+/// **تنها منبع حقیقت** برای سقف‌های قابل‌تنظیمِ booking و pricing. مقادیر توسط
+/// owner از طریق `PATCH /settings` تغییر می‌کنند و بلافاصله در runtime اثر می‌گذارند.
+///
+/// ستون‌ها عمداً `@default` ندارند: ردیف اولیه با مقادیر صریح (`DEFAULT_SETTINGS`)
+/// ساخته می‌شود تا پیش‌فرض‌ها فقط یک منبع داشته باشند.
 model Setting {
-  id               Int @id @default(autoincrement())
-  minBookingLength Int @default(1) @map("min_booking_length")
-  maxBookingLength Int @default(30) @map("max_booking_length")
-  maxGuests        Int @default(10) @map("max_guests")
-  breakfastPrice   Int @default(15) @map("breakfast_price")
+  id Int @id @default(autoincrement())
+
+  // ── Booking ──────────────────────────────────────────────
+  minBookingLength           Int @map("min_booking_length")
+  maxBookingLength           Int @map("max_booking_length")
+  maxGuests                  Int @map("max_guests")
+  maxAdvanceBookingDays      Int @map("max_advance_booking_days")
+  maxPendingBookingsPerGuest Int @map("max_pending_bookings_per_guest")
+  paymentDeadlineMinutes     Int @map("payment_deadline_minutes")
+
+  // ── Pricing ──────────────────────────────────────────────
+  maxDiscountsPerNight     Int @map("max_discounts_per_night")
+  maxSurchargesPerNight    Int @map("max_surcharges_per_night")
+  maxTotalDiscountPercent  Int @map("max_total_discount_percent")
+  maxTotalSurchargePercent Int @map("max_total_surcharge_percent")
+  maxNightlyPrice          Int @map("max_nightly_price")
+  minRegularPrice          Int @map("min_regular_price")
+  maxRegularPrice          Int @map("max_regular_price")
+  startingPriceWindowDays  Int @map("starting_price_window_days")
+  priceRuleMaxFutureDays   Int @map("price_rule_max_future_days")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -345,6 +370,8 @@ model PriceRule {
 
   @@index([cabinId, isActive])
   @@index([isActive, endDate])
+  @@index([createdById])
+  @@index([updatedById])
   @@map("price_rules")
 }
 
@@ -361,6 +388,7 @@ model PriceRuleAudit {
 
   @@index([ruleId])
   @@index([cabinId])
+  @@index([actorId])
   @@map("price_rule_audits")
 }
 

@@ -4,7 +4,8 @@ import type { Booking, UserRole } from "../generated/prisma/client.js";
 import { AppError } from "../utils/AppError.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
-import { getBookingSettings, TIMEZONE } from "../constants/booking.constants.js";
+import { getPricingLimits, currentSettings } from "../cache/setting.store.js";
+import { TIMEZONE } from "../constants/booking.constants.js";
 import { isValidStatusTransition, hasFullBookingAccess } from "../utils/booking.util.js";
 import { simulatePaymentGateway } from "../utils/payment.util.js";
 import { validateStayRange } from "../utils/booking-date.util.js";
@@ -16,7 +17,6 @@ import * as guestRepository from "../repositories/guest.repository.js";
 import * as priceRuleRepository from "../repositories/price-rule.repository.js";
 import { prisma } from "../config/database.js";
 import logger from "../config/logger.js";
-import { getPricingLimits } from "../constants/pricing.constants.js";
 import type { z } from "zod";
 import type {
   createBookingSchema,
@@ -66,11 +66,12 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
     throw new AppError("Guest profile not found", HTTP_STATUS.FORBIDDEN, ErrorCode.FORBIDDEN);
   }
 
-  const settings = getBookingSettings();
+  const settings = currentSettings();
 
   //* قواعد تاریخ رزرو — از تابع مشترک با endpoint قیمت‌گذاری استفاده می‌شود.
   const { numNights } = validateStayRange(
     { startDate: input.startDate, endDate: input.endDate },
+    settings,
     now,
   );
 
@@ -79,7 +80,7 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
     throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
   }
 
-  const maxGuests = Math.min(cabin.maxCapacity, settings.maxGuestsPerBooking);
+  const maxGuests = Math.min(cabin.maxCapacity, settings.maxGuests);
   if (input.numGuests > maxGuests) {
     throw new AppError(
       `Maximum ${maxGuests} guests allowed for this cabin`,
@@ -88,7 +89,7 @@ export async function createBooking(input: CreateBookingInput, userId: number): 
     );
   }
 
-  const limits = await getPricingLimits();
+  const limits = getPricingLimits();
   const paymentDeadline = addMinutes(now, settings.paymentDeadlineMinutes);
 
   //* تراکنش ممکن است چند بار اجرا شود؛ پس هیچ side effect بیرون از آن داخل callback نگذار.
@@ -361,7 +362,7 @@ export async function getBookedDates(
     throw new AppError("Cabin not found", HTTP_STATUS.NOT_FOUND, ErrorCode.NOT_FOUND);
   }
 
-  const settings = getBookingSettings();
+  const settings = currentSettings();
 
   const from = query.from ?? todayInTimezone(TIMEZONE, now);
   const to = query.to ?? addDaysUtc(from, settings.bookedDatesMaxRangeDays);
