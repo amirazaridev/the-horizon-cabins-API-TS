@@ -8,8 +8,8 @@ import {
   MAX_TOTAL_SURCHARGE_PERCENT,
   MIN_REGULAR_PRICE,
   PRICE_CALENDAR_HORIZON_DAYS,
-  getPricingLimits,
 } from "../../../src/constants/pricing.constants.js";
+import { getPricingLimits } from "../../../src/services/setting.store.js";
 
 describe("pricing.constants", () => {
   it("keeps the worst-case stay total within a 32-bit Int", () => {

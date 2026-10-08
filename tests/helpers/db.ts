@@ -1,4 +1,5 @@
 import { prisma } from "../../src/config/database.js";
+import { resetSettingsCache } from "../../src/services/setting.store.js";
 
 /**
  * پاک‌سازی دیتابیس بین تست‌ها.
@@ -29,6 +30,8 @@ const TRUNCATABLE_TABLES = [
 export async function resetDatabase(): Promise<void> {
   const tableList = TRUNCATABLE_TABLES.map((t) => `"${t}"`).join(", ");
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tableList} RESTART IDENTITY CASCADE`);
+  //* کش تنظیمات در حافظه باید با پاک‌شدن جدول هم‌گام شود.
+  resetSettingsCache();
 }
 
 /** قطع اتصال (برای afterAll فایل‌ها). */

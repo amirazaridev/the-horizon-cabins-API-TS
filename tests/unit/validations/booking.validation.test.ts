@@ -7,6 +7,7 @@ import {
   getBookingSchema,
 } from "../../../src/validations/booking.validation.js";
 import { BOOKING_CONSTANTS } from "../../../src/constants/booking.constants.js";
+import { currentSettings } from "../../../src/services/setting.store.js";
 
 const DAY_MS = 86_400_000;
 
@@ -218,7 +219,8 @@ describe("booking.validation", () => {
   });
 
   describe("bookedDatesSchema", () => {
-    const parse = (query: Record<string, unknown>) => bookedDatesSchema.query.safeParse(query);
+    const parse = (query: Record<string, unknown>) =>
+      bookedDatesSchema(currentSettings()).query.safeParse(query);
 
     it("should accept an empty query", () => {
       expect(parse({}).success).toBe(true);
@@ -263,13 +265,15 @@ describe("booking.validation", () => {
     });
 
     it("should transform the cabinId param to a number", () => {
-      const result = bookedDatesSchema.params.safeParse({ cabinId: "12" });
+      const result = bookedDatesSchema(currentSettings()).params.safeParse({ cabinId: "12" });
       expect(result.success).toBe(true);
       expect(result.data!.cabinId).toBe(12);
     });
 
     it("should reject a non-numeric cabinId param", () => {
-      expect(bookedDatesSchema.params.safeParse({ cabinId: "abc" }).success).toBe(false);
+      expect(
+        bookedDatesSchema(currentSettings()).params.safeParse({ cabinId: "abc" }).success,
+      ).toBe(false);
     });
   });
 
