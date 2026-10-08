@@ -1,14 +1,33 @@
-// import { prisma } from '../config/database.js';
+import { prisma } from "../config/database.js";
+import type { Setting } from "../generated/prisma/client.js";
+import type { SettingsColumns } from "../types/setting.types.js";
 
-// const DEFAULT_SETTINGS = {
-//   minBookingLength: 1,
-//   maxBookingLength: 30,
-//   maxGuests: 10,
-//   breakfastPrice: 15, // یادت باشه این عدد رو با 150000 (تو getSingleton قدیمی) چک کنی
-// };
+/**
+ * دسترسی به ردیف **singleton** تنظیمات.
+ *
+ * جدول `settings` عمداً یک ردیف دارد؛ همه‌ی توابع روی کوچک‌ترین id کار می‌کنند
+ * تا اگر اشتباهاً چند ردیف ساخته شد، رفتار قطعی و تکرارپذیر بماند.
+ */
 
-// export async function getSettings() {
-//   const settings = await prisma.setting.findFirst();
-//   if (settings) return settings;
-//   return prisma.setting.create({ data: DEFAULT_SETTINGS });
-// }
+/** ردیف تنظیمات (کوچک‌ترین id) یا `null` اگر هنوز ساخته نشده باشد. */
+export async function findSettings(): Promise<Setting | null> {
+  return prisma.setting.findFirst({ orderBy: { id: "asc" } });
+}
+
+/** ساخت ردیف اولیه‌ی تنظیمات. */
+export async function createSettings(data: SettingsColumns): Promise<Setting> {
+  return prisma.setting.create({ data });
+}
+
+/**
+ * نوشتن مقادیر تنظیمات روی ردیف موجود؛ اگر ردیفی وجود نداشته باشد، می‌سازد.
+ * کل مقادیر (نه فقط فیلدهای تغییرکرده) نوشته می‌شود چون سرویس از قبل merge
+ * کرده است.
+ */
+export async function saveSettings(data: SettingsColumns): Promise<Setting> {
+  const existing = await findSettings();
+  if (existing) {
+    return prisma.setting.update({ where: { id: existing.id }, data });
+  }
+  return createSettings(data);
+}
