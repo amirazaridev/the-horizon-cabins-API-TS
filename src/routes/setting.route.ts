@@ -7,6 +7,11 @@ import { BOOKING_ADMIN_ROLES } from "../constants/booking.constants.js";
 
 const router = Router();
 
+//? تنظیمات عمومی — **بدون احراز هویت**؛ کلاینت برای ساختن تقویم و اعتبارسنجی
+//? ابتدایی رزرو لازم دارد (سقف افق رزرو، طول اقامت، تعداد نفرات، مهلت پرداخت).
+//? ⚠️ عمداً قبل از `router.use(protect)` ثبت می‌شود.
+router.get("/public", settingController.getPublicSettings);
+
 router.use(protect);
 
 //? خواندن تنظیمات برای admin|owner؛ ویرایش فقط برای owner.

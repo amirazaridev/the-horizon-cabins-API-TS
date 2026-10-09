@@ -8,7 +8,7 @@ import * as settingRepository from "../repositories/setting.repository.js";
 import * as cabinRepository from "../repositories/cabin.repository.js";
 import * as priceRuleRepository from "../repositories/price-rule.repository.js";
 import * as bookingRepository from "../repositories/booking.repository.js";
-import { applySettingsRow, refreshSettings } from "../cache/setting.store.js";
+import { applySettingsRow, currentSettings, refreshSettings } from "../cache/setting.store.js";
 import { PRICING_AFFECTING_SETTINGS, SETTINGS_FIELDS } from "../constants/setting.constants.js";
 import { assertConsistent, type UpdateSettingsInput } from "../validations/setting.validation.js";
 import { rebuildAllCabinPriceCalendars } from "./price-calendar.service.js";
@@ -29,6 +29,38 @@ export interface SettingsUpdateResult {
 /** خواندن تنظیمات مؤثر — همیشه از DB تازه می‌شود (کش با گارد updatedAt به‌روز می‌شود). */
 export async function getSettings(): Promise<Readonly<AppSettings>> {
   return refreshSettings();
+}
+
+/**
+ * زیرمجموعه‌ی **عمومی** تنظیمات — بدون احراز هویت.
+ *
+ * سمت کلاینت برای ساختن تقویم و اعتبارسنجی ابتدایی رزرو به این مقادیر نیاز
+ * دارد، ولی کل جدول تنظیمات (سقف‌های قیمت‌گذاری و ...) نباید عمومی شود. پس
+ * فقط فیلدهای لازم برای UI برگردانده می‌شوند.
+ *
+ * مقدار از **کش runtime** خوانده می‌شود (sync و بدون کوئری DB) چون این مسیر
+ * عمومی و پرخواننده است و کش در startup و بعد از هر PATCH تازه می‌شود.
+ */
+export interface PublicSettings {
+  minBookingLength: number;
+  maxBookingLength: number;
+  maxGuests: number;
+  maxAdvanceBookingDays: number;
+  paymentDeadlineMinutes: number;
+  /** افق تقویم قیمت — همان افق رزرو (طبق طراحی «تقویم = رزرو»). */
+  priceCalendarHorizonDays: number;
+}
+
+export function getPublicSettings(): PublicSettings {
+  const settings = currentSettings();
+  return {
+    minBookingLength: settings.minBookingLength,
+    maxBookingLength: settings.maxBookingLength,
+    maxGuests: settings.maxGuests,
+    maxAdvanceBookingDays: settings.maxAdvanceBookingDays,
+    paymentDeadlineMinutes: settings.paymentDeadlineMinutes,
+    priceCalendarHorizonDays: settings.priceCalendarHorizonDays,
+  };
 }
 
 /** فیلدهایی که ورودی واقعاً تغییرشان می‌دهد (نه فقط حضور در بدنه). */

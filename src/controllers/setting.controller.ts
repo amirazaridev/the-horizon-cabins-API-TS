@@ -9,6 +9,12 @@ export async function getSettings(_req: Request, res: Response): Promise<void> {
   sendSuccess(res, { data: { settings } });
 }
 
+/** زیرمجموعه‌ی عمومی تنظیمات — بدون احراز هویت (برای تقویم و رزرو کلاینت). */
+export function getPublicSettings(_req: Request, res: Response): void {
+  const settings = settingService.getPublicSettings();
+  sendSuccess(res, { data: { settings } });
+}
+
 export async function updateSettings(req: Request, res: Response): Promise<void> {
   const input = getBody<UpdateSettingsInput>(req);
   const result = await settingService.updateSettings(input);

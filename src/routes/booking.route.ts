@@ -8,14 +8,17 @@ import { BOOKING_ADMIN_ROLES } from "../constants/booking.constants.js";
 
 const router = Router();
 
-router.use(protect);
-
-//? تقویم تاریخ‌های رزرو‌شده‌ی یک کابین (برای کلاینت‌ها هم قابل دسترسی است)
+//? تقویم تاریخ‌های رزرو‌شده‌ی یک کابین — **عمومی** (بدون احراز هویت).
+//? صفحه‌ی جزئیات کابین برای همه‌ی بازدیدکننده‌ها (حتی بدون ورود) نمایش داده
+//? می‌شود، پس روزهای پرشده هم باید برای همه غیرفعال شوند.
+//? ⚠️ عمداً قبل از `router.use(protect)` ثبت می‌شود.
 router.get(
   "/cabin/:cabinId/booked-dates",
   validate(bookingValidation.bookedDatesSchema),
   bookingController.getBookedDates,
 );
+
+router.use(protect);
 
 router
   .route("/")
