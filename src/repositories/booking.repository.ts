@@ -10,10 +10,27 @@ type Db = typeof prisma | PrismaTransactionClient;
 function buildWhereClause(filters: BookingFilters): Prisma.BookingWhereInput {
   const where: Prisma.BookingWhereInput = {};
 
-  if (filters.status) where.status = filters.status;
+  //* فیلتر چندوضعیتی (داشبورد) اولویت دارد؛ وگرنه تک‌وضعیتی (جریان مهمان).
+  if (filters.statuses && filters.statuses.length > 0) {
+    where.status = { in: filters.statuses };
+  } else if (filters.status) {
+    where.status = filters.status;
+  }
+
   if (filters.cabinId !== undefined) where.cabinId = filters.cabinId;
   if (filters.guestId !== undefined) where.guestId = filters.guestId;
-  if (filters.guestUserId !== undefined) where.guest = { userId: filters.guestUserId };
+
+  //* فیلتر شهر از طریق رابطه‌ی اقامتگاه.
+  if (filters.cityId !== undefined) where.cabin = { cityId: filters.cityId };
+
+  //* محدودسازی/جستجوی مهمان — هر دو شرط روی همان رابطه‌ی `guest` می‌نشینند.
+  const guestWhere: Prisma.GuestWhereInput = {};
+  if (filters.guestUserId !== undefined) guestWhere.userId = filters.guestUserId;
+  if (filters.guestQuery) {
+    guestWhere.fullName = { contains: filters.guestQuery, mode: "insensitive" };
+  }
+  if (Object.keys(guestWhere).length > 0) where.guest = guestWhere;
+
   if (filters.startDateFrom || filters.startDateTo) {
     where.startDate = {};
     if (filters.startDateFrom) where.startDate.gte = filters.startDateFrom;

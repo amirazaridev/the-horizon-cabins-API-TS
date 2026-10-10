@@ -9,6 +9,7 @@ import locationRouter from "./location.route.js";
 import priceRuleRouter from "./price-rule.route.js";
 import priceCalendarRouter from "./price-calendar.route.js";
 import settingRouter from "./setting.route.js";
+import dashboardRouter from "./dashboard.route.js";
 
 const router = Router();
 router.use("/auth", authRouter);
@@ -21,5 +22,6 @@ router.use("/locations", locationRouter);
 router.use("/price-rules", priceRuleRouter);
 router.use("/price-calendar", priceCalendarRouter);
 router.use("/settings", settingRouter);
+router.use("/dashboard", dashboardRouter);
 
 export default router;

@@ -20,6 +20,10 @@ export const ErrorCode = {
   // User
   USER_NOT_FOUND: "USER_NOT_FOUND",
   DUPLICATE_EMAIL: "DUPLICATE_EMAIL",
+  /** سقف دو مالک رعایت نشده. */
+  OWNER_LIMIT_REACHED: "OWNER_LIMIT_REACHED",
+  /** کاربر دارای وابستگی (رزرو/قاعده‌ی قیمت) است و حذف نمی‌شود. */
+  USER_HAS_DEPENDENCIES: "USER_HAS_DEPENDENCIES",
 
   // Validation
   VALIDATION_ERROR: "VALIDATION_ERROR",

@@ -34,3 +34,21 @@ export function safeBoolean(value: unknown): unknown {
   if (value === "false" || value === "0") return false;
   return value;
 }
+
+/**
+ * تبدیل یک پارامتر کوئری چندمقداری به آرایه‌ی رشته‌های غیرخالی.
+ *
+ * پشتیبانی از هر دو شکل: CSV (`?x=1,2,3`) و تکرارشده (`?x=1&x=2`).
+ * مقدار خالی/غایب ⇒ `undefined` تا معنای «بدون فیلتر» حفظ شود.
+ */
+export function csvToArray(raw: unknown): unknown {
+  if (raw === undefined || raw === null) return undefined;
+
+  const parts = Array.isArray(raw) ? raw : [raw];
+  const items = parts
+    .flatMap((part) => (typeof part === "string" ? part.split(",") : part))
+    .map((item) => String(item).trim())
+    .filter(Boolean);
+
+  return items.length ? items : undefined;
+}

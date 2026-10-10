@@ -15,8 +15,11 @@ export async function getAll(req: Request, res: Response): Promise<void> {
 
   const filters: BookingFilters = {
     status: query.status,
+    statuses: query.statuses,
     cabinId: query.cabinId,
+    cityId: query.cityId,
     guestId: query.guestId,
+    guestQuery: query.guestQuery,
     startDateFrom: query.startDateFrom,
     startDateTo: query.startDateTo,
   };
