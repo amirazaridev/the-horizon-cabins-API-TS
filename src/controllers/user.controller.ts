@@ -41,7 +41,7 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
    پنل مدیریت کاربران
    ========================================================================== */
 
-/** لیست کاربران مهمان (صفحه‌بندی‌شده) با فیلتر جستجو/وضعیت. */
+/** لیست کاربران (صفحه‌بندی‌شده) با فیلتر نقش/جستجو/وضعیت. */
 export async function getAll(req: Request, res: Response): Promise<void> {
   const { skip, limit, page } = req.pagination!;
   const query = getQuery<ListUsersQuery>(req);
@@ -50,7 +50,8 @@ export async function getAll(req: Request, res: Response): Promise<void> {
     skip,
     limit,
     page,
-    filters: { q: query.q, active: query.active },
+    filters: { q: query.q, active: query.active, roles: query.roles },
+    actor: req.user!,
   });
 
   sendSuccess(res, { data: { users, meta } });
@@ -59,13 +60,19 @@ export async function getAll(req: Request, res: Response): Promise<void> {
 /** فعال/غیرفعال‌کردن حساب کاربر. */
 export async function updateStatus(req: Request, res: Response): Promise<void> {
   const { active } = getBody<UpdateUserStatusInput>(req);
-  const user = await userService.setUserStatus(getIntParam(req, "id"), active);
+  const user = await userService.setUserStatus(getIntParam(req, "id"), active, req.user!);
   sendSuccess(res, { data: { user } });
 }
 
 /** تغییر نقش کاربر (حساس — فقط owner). */
 export async function updateRole(req: Request, res: Response): Promise<void> {
   const { role } = getBody<UpdateUserRoleInput>(req);
-  const user = await userService.setUserRole(getIntParam(req, "id"), role);
+  const user = await userService.setUserRole(getIntParam(req, "id"), role, req.user!);
   sendSuccess(res, { data: { user } });
+}
+
+/** حذف کامل کاربر (فقط owner و با رعایت گاردهای سیاست). */
+export async function remove(req: Request, res: Response): Promise<void> {
+  await userService.deleteUser(getIntParam(req, "id"), req.user!);
+  sendSuccess(res, { data: { deleted: true } });
 }

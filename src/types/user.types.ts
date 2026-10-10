@@ -1,5 +1,6 @@
 // src/types/user.types.ts
 import type { Prisma } from "../generated/prisma/client.js";
+import type { UserRole } from "../generated/prisma/enums.js";
 
 export type SafeUser = Prisma.UserGetPayload<{ omit: { password: true } }>;
 
@@ -37,12 +38,21 @@ export type AdminUser = Prisma.UserGetPayload<{ select: typeof adminUserSelect }
 /**
  * فیلترهای لیست کاربران پنل مدیریت.
  *
- * ⚠️ دامنه‌ی لیست همیشه «مهمان‌ها» است (نقش `guest`) و اینجا فقط
- * محدودسازی‌های روی همان مجموعه می‌آید؛ فیلتر نقش لازم نیست.
+ * `roles` دامنه‌ی لیست را تعیین می‌کند: صفحه‌ی «افراد و مهمانان» مقدار
+ * `["guest"]` و صفحه‌ی «مدیران» مقدار `["admin","owner"]` می‌فرستد. اگر
+ * نیامده باشد، پیش‌فرض `["guest"]` است (رفتار قبلی حفظ می‌شود).
  */
 export interface UserFilters {
   /** جستجو روی ایمیل کاربر یا نام/تلفن مهمان (حداقل ۲ کاراکتر). */
   q?: string;
   /** وضعیت حساب: فعال/غیرفعال. */
   active?: boolean;
+  /** نقش‌های داخل لیست. */
+  roles?: UserRole[];
+}
+
+/** بازیگر یک عملیات مدیریتی — از `req.user` می‌آید. */
+export interface UserActor {
+  id: number;
+  role: UserRole;
 }

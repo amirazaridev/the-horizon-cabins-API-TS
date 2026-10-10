@@ -40,4 +40,12 @@ router.patch(
   userController.updateRole,
 );
 
+//? حذف حساب — فقط owner؛ گاردهای «مالک حذف‌نشدنی» و «وابستگی‌ها» در سرویس.
+router.delete(
+  "/:id",
+  restrictTo("owner"),
+  validate(userValidation.deleteUserSchema),
+  userController.remove,
+);
+
 export default router;

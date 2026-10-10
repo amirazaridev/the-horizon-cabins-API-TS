@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  deleteUserSchema,
   listUsersQueryValidation,
   updateProfileSchema,
   updateUserRoleSchema,
@@ -171,6 +172,27 @@ describe("user.validation — admin user management", () => {
 
     it("should reject a limit above the maximum", () => {
       expect(parse({ limit: "500" }).success).toBe(false);
+    });
+
+    it("should parse a CSV `roles` list", () => {
+      const result = parse({ roles: "admin,owner" });
+      expect(result.success).toBe(true);
+      expect(result.success && result.data.roles).toEqual(["admin", "owner"]);
+    });
+
+    it("should reject an unknown role inside `roles`", () => {
+      expect(parse({ roles: "admin,superuser" }).success).toBe(false);
+    });
+  });
+
+  describe("deleteUserSchema", () => {
+    it("should coerce a numeric id param", () => {
+      const result = deleteUserSchema.params.safeParse({ id: "9" });
+      expect(result.success && result.data.id).toBe(9);
+    });
+
+    it("should reject a non-numeric id param", () => {
+      expect(deleteUserSchema.params.safeParse({ id: "abc" }).success).toBe(false);
     });
   });
 

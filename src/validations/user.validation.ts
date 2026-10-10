@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { Gender, UserRole } from "../generated/prisma/enums.js";
 import { safeNumber } from "../utils/safeParseNumber.js";
-import { dateOnlySchema, idParamsSchema, safeBoolean } from "./shared.validation.js";
+import {
+  csvToArray,
+  dateOnlySchema,
+  idParamsSchema,
+  safeBoolean,
+} from "./shared.validation.js";
 
 /**
  * اعتبارسنجی ویرایش پروفایل کاربر (`PATCH /user/me`).
@@ -79,19 +84,24 @@ export type UpdateProfileInput = z.infer<typeof updateProfileBodySchema>;
 /**
  * کوئری لیست کاربران.
  *
- * ⚠️ `q` حداقل ۲ کاراکتر است تا جستجوی تک‌حرفی کل جدول را برنگرداند
- * (همان قراردادی که فیلتر رزروها دارد).
+ * - `q` حداقل ۲ کاراکتر است تا جستجوی تک‌حرفی کل جدول را برنگرداند.
+ * - `roles` به‌شکل CSV می‌آید (`?roles=admin,owner`) و دامنه‌ی لیست را تعیین
+ *   می‌کند؛ غایب ⇒ پیش‌فرض `["guest"]` در لایه‌ی repository.
  */
 const listUsersQuerySchema = z.object({
   page: z.preprocess(safeNumber, z.number().int().min(1).default(1)),
   limit: z.preprocess(safeNumber, z.number().int().min(1).max(100).default(10)),
   q: z.string().trim().min(2).max(100).optional(),
   active: z.preprocess(safeBoolean, z.boolean().optional()),
+  roles: z.preprocess(csvToArray, z.array(z.enum(UserRole)).optional()),
 });
 
 export const listUsersQueryValidation = { query: listUsersQuerySchema };
 
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+
+/** پارامتر مسیر `:id` برای حذف کاربر. */
+export const deleteUserSchema = { params: idParamsSchema };
 
 /** بدنه‌ی فعال/غیرفعال‌کردن حساب. */
 const updateUserStatusBodySchema = z.object({

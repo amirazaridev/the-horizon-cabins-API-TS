@@ -62,11 +62,14 @@ export async function createUser(data: Prisma.UserCreateInput): Promise<SafeUser
 /**
  * ساخت `where` لیست کاربران.
  *
- * ⚠️ دامنه همیشه به نقش `guest` محدود است (صفحه‌ی «افراد و مهمانان»)؛ پس
- * مدیران/مالکان هرگز در این لیست نمی‌آیند و نیازی به فیلتر نقش نیست.
+ * ⚠️ دامنه‌ی لیست از `filters.roles` می‌آید (پیش‌فرض `["guest"]`) تا صفحه‌ی
+ * «افراد و مهمانان» فقط مهمان‌ها و صفحه‌ی «مدیران» فقط admin/owner را ببیند.
  */
 function buildUserWhereClause(filters: UserFilters): Prisma.UserWhereInput {
-  const where: Prisma.UserWhereInput = { role: "guest" };
+  const roles =
+    filters.roles && filters.roles.length > 0 ? filters.roles : (["guest"] as const);
+
+  const where: Prisma.UserWhereInput = { role: { in: [...roles] } };
 
   if (filters.active !== undefined) where.active = filters.active;
 
@@ -82,8 +85,8 @@ function buildUserWhereClause(filters: UserFilters): Prisma.UserWhereInput {
   return where;
 }
 
-/** یک صفحه از کاربران مهمان + شمارش کل، با فیلترهای جستجو/وضعیت. */
-export async function findAllGuests({
+/** یک صفحه از کاربران + شمارش کل، با فیلترهای نقش/جستجو/وضعیت. */
+export async function findManyUsers({
   skip,
   limit,
   filters,
@@ -108,17 +111,34 @@ export async function findAllGuests({
   return { data, total };
 }
 
-/**
- * یافتن یک کاربر **مهمان** با شناسه.
- *
- * ⚠️ محدود به `role: "guest"` است تا عملیات مدیریتی فقط روی همان دامنه‌ی
- * لیست اثر بگذارد و اشتباهاً روی admin/owner اعمال نشود.
- */
-export async function findGuestById(id: number): Promise<AdminUser | null> {
+/** یافتن یک کاربر (هر نقشی) با شناسه — برای اعمال گاردهای سیاست در سرویس. */
+export async function findManagedUserById(id: number): Promise<AdminUser | null> {
   return prisma.user.findFirst({
-    where: { id, role: "guest" },
+    where: { id },
     select: adminUserSelect,
   });
+}
+
+/** شمارش مالکان — برای اعمال سقف «حداکثر دو مالک». */
+export async function countOwners(): Promise<number> {
+  return prisma.user.count({ where: { role: "owner" } });
+}
+
+/**
+ * شمارش وابستگی‌هایی که حذف کاربر را ناممکن می‌کنند.
+ *
+ * ⚠️ FKهای `Booking.guest` و `PriceRule.createdBy/updatedBy` روی `Restrict`
+ * هستند؛ پس قبل از حذف باید مطمئن شویم وگرنه Prisma خطای FK می‌دهد.
+ */
+export async function countUserDependencies(
+  id: number,
+): Promise<{ bookings: number; priceRules: number }> {
+  const [bookings, priceRules] = await Promise.all([
+    prisma.booking.count({ where: { guest: { userId: id } } }),
+    prisma.priceRule.count({ where: { OR: [{ createdById: id }, { updatedById: id }] } }),
+  ]);
+
+  return { bookings, priceRules };
 }
 
 /** فعال/غیرفعال‌کردن حساب کاربر. */
@@ -137,4 +157,9 @@ export async function updateUserRole(id: number, role: UserRole): Promise<AdminU
     data: { role },
     select: adminUserSelect,
   });
+}
+
+/** حذف کامل کاربر (پروفایل مهمان با Cascade حذف می‌شود). */
+export async function deleteUserById(id: number): Promise<void> {
+  await prisma.user.delete({ where: { id } });
 }
