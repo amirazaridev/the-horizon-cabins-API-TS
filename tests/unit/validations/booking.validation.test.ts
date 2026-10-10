@@ -277,6 +277,54 @@ describe("booking.validation", () => {
     });
   });
 
+  describe("listBookingsQueryValidation — dashboard filters", () => {
+    it("should parse a CSV `statuses` list into an array", () => {
+      const result = listBookingsQueryValidation.query.safeParse({
+        statuses: "confirmed,checkedIn",
+      });
+      expect(result.success).toBe(true);
+      expect(result.data!.statuses).toEqual(["confirmed", "checkedIn"]);
+    });
+
+    it("should treat an empty `statuses` as undefined (no filter)", () => {
+      const result = listBookingsQueryValidation.query.safeParse({ statuses: "" });
+      expect(result.success).toBe(true);
+      expect(result.data!.statuses).toBeUndefined();
+    });
+
+    it("should reject an unknown status inside `statuses`", () => {
+      expect(
+        listBookingsQueryValidation.query.safeParse({ statuses: "confirmed,bogus" }).success,
+      ).toBe(false);
+    });
+
+    it("should coerce `cityId` to a number", () => {
+      const result = listBookingsQueryValidation.query.safeParse({ cityId: "3" });
+      expect(result.success).toBe(true);
+      expect(result.data!.cityId).toBe(3);
+    });
+
+    it("should reject a non-positive `cityId`", () => {
+      expect(listBookingsQueryValidation.query.safeParse({ cityId: "0" }).success).toBe(false);
+    });
+
+    it("should accept and trim a `guestQuery` of at least 2 chars", () => {
+      const result = listBookingsQueryValidation.query.safeParse({ guestQuery: "  ali  " });
+      expect(result.success).toBe(true);
+      expect(result.data!.guestQuery).toBe("ali");
+    });
+
+    it("should reject a `guestQuery` shorter than 2 chars", () => {
+      expect(listBookingsQueryValidation.query.safeParse({ guestQuery: "a" }).success).toBe(false);
+    });
+
+    it("should still accept the legacy single `status`", () => {
+      const result = listBookingsQueryValidation.query.safeParse({ status: "confirmed" });
+      expect(result.success).toBe(true);
+      expect(result.data!.status).toBe("confirmed");
+    });
+  });
+
   describe("idParamsSchema (getBookingSchema)", () => {
     it("should coerce a numeric id", () => {
       const result = getBookingSchema.params.safeParse({ id: "42" });

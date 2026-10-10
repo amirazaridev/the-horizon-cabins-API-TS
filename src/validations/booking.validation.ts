@@ -2,7 +2,7 @@ import { z } from "zod";
 import { safeNumber } from "../utils/safeParseNumber.js";
 import { paginationQueryValidation } from "./pagination.validation.js";
 import { BookingStatus } from "../generated/prisma/enums.js";
-import { cabinIdParamsSchema, dateOnlySchema, idParamsSchema } from "./shared.validation.js";
+import { cabinIdParamsSchema, csvToArray, dateOnlySchema, idParamsSchema } from "./shared.validation.js";
 import type { AppSettings } from "../types/setting.types.js";
 
 const DAY_MS = 86_400_000;
@@ -25,8 +25,14 @@ const priceQuoteQuerySchema = z.object({
 
 const listBookingsQuerySchema = z.object({
   status: z.enum(BookingStatus).optional(),
+  /** فیلتر چندوضعیتی داشبورد — CSV (`?statuses=confirmed,checkedIn`). */
+  statuses: z.preprocess(csvToArray, z.array(z.enum(BookingStatus)).optional()),
   cabinId: z.preprocess(safeNumber, z.number().int().positive().optional()),
+  /** فیلتر شهر — از طریق رابطه‌ی اقامتگاه. */
+  cityId: z.preprocess(safeNumber, z.number().int().positive().optional()),
   guestId: z.preprocess(safeNumber, z.number().int().positive().optional()),
+  /** جستجوی نام مهمان (حداقل ۲ کاراکتر). */
+  guestQuery: z.string().trim().min(2).max(100).optional(),
   startDateFrom: dateOnlySchema.optional(),
   startDateTo: dateOnlySchema.optional(),
 });
