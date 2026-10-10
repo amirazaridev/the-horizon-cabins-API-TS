@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { Gender } from "../generated/prisma/enums.js";
-import { dateOnlySchema } from "./shared.validation.js";
+import { Gender, UserRole } from "../generated/prisma/enums.js";
+import { safeNumber } from "../utils/safeParseNumber.js";
+import { dateOnlySchema, idParamsSchema, safeBoolean } from "./shared.validation.js";
 
 /**
  * اعتبارسنجی ویرایش پروفایل کاربر (`PATCH /user/me`).
@@ -70,3 +71,54 @@ const updateProfileBodySchema = z.object({
 export const updateProfileSchema = { body: updateProfileBodySchema };
 
 export type UpdateProfileInput = z.infer<typeof updateProfileBodySchema>;
+
+/* ==========================================================================
+   پنل مدیریت کاربران
+   ========================================================================== */
+
+/**
+ * کوئری لیست کاربران.
+ *
+ * ⚠️ `q` حداقل ۲ کاراکتر است تا جستجوی تک‌حرفی کل جدول را برنگرداند
+ * (همان قراردادی که فیلتر رزروها دارد).
+ */
+const listUsersQuerySchema = z.object({
+  page: z.preprocess(safeNumber, z.number().int().min(1).default(1)),
+  limit: z.preprocess(safeNumber, z.number().int().min(1).max(100).default(10)),
+  q: z.string().trim().min(2).max(100).optional(),
+  active: z.preprocess(safeBoolean, z.boolean().optional()),
+});
+
+export const listUsersQueryValidation = { query: listUsersQuerySchema };
+
+export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+
+/** بدنه‌ی فعال/غیرفعال‌کردن حساب. */
+const updateUserStatusBodySchema = z.object({
+  active: z.boolean(),
+});
+
+export const updateUserStatusSchema = {
+  params: idParamsSchema,
+  body: updateUserStatusBodySchema,
+};
+
+export type UpdateUserStatusInput = z.infer<typeof updateUserStatusBodySchema>;
+
+/**
+ * بدنه‌ی تغییر نقش.
+ *
+ * ⚠️ مقادیر مجاز همان enum بک‌اند (`user_role`) است؛ نقش‌های حساس
+ * (admin/owner) از همین‌جا پذیرفته می‌شوند و کنترل دسترسی در لایه‌ی route
+ * با `restrictTo("owner")` اعمال می‌شود.
+ */
+const updateUserRoleBodySchema = z.object({
+  role: z.enum(UserRole),
+});
+
+export const updateUserRoleSchema = {
+  params: idParamsSchema,
+  body: updateUserRoleBodySchema,
+};
+
+export type UpdateUserRoleInput = z.infer<typeof updateUserRoleBodySchema>;

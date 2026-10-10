@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { updateProfileSchema } from "../../../src/validations/user.validation.js";
+import {
+  listUsersQueryValidation,
+  updateProfileSchema,
+  updateUserRoleSchema,
+  updateUserStatusSchema,
+} from "../../../src/validations/user.validation.js";
 
 /** استخراج پیام‌های خطا از نتیجه‌ی safeParse برای assert راحت‌تر. */
 function issues(result: { success: boolean; error?: { issues: unknown[] } }) {
@@ -121,5 +126,76 @@ describe("user.validation — updateProfileSchema", () => {
     expect(result.success).toBe(true);
     expect(result.data).not.toHaveProperty("email");
     expect(result.data).not.toHaveProperty("role");
+  });
+});
+
+describe("user.validation — admin user management", () => {
+  describe("listUsersQueryValidation", () => {
+    const parse = (query: Record<string, unknown>) =>
+      listUsersQueryValidation.query.safeParse(query);
+
+    it("should apply pagination defaults and leave filters empty", () => {
+      const result = parse({});
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      expect(result.data).toMatchObject({ page: 1, limit: 10 });
+      expect(result.data.q).toBeUndefined();
+      expect(result.data.active).toBeUndefined();
+    });
+
+    it("should coerce numeric strings for page/limit", () => {
+      const result = parse({ page: "3", limit: "25" });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+
+      expect(result.data.page).toBe(3);
+      expect(result.data.limit).toBe(25);
+    });
+
+    it("should parse the boolean `active` from a query string", () => {
+      const yes = parse({ active: "true" });
+      expect(yes.success && yes.data.active).toBe(true);
+
+      const no = parse({ active: "0" });
+      expect(no.success && no.data.active).toBe(false);
+    });
+
+    it("should reject a `q` shorter than 2 characters", () => {
+      expect(parse({ q: "a" }).success).toBe(false);
+    });
+
+    it("should reject an unknown `active` value", () => {
+      expect(parse({ active: "maybe" }).success).toBe(false);
+    });
+
+    it("should reject a limit above the maximum", () => {
+      expect(parse({ limit: "500" }).success).toBe(false);
+    });
+  });
+
+  describe("updateUserStatusSchema", () => {
+    it("should accept a boolean body and a numeric id param", () => {
+      expect(updateUserStatusSchema.body.safeParse({ active: false }).success).toBe(true);
+
+      const params = updateUserStatusSchema.params.safeParse({ id: "12" });
+      expect(params.success && params.data.id).toBe(12);
+    });
+
+    it("should reject a non-boolean body", () => {
+      expect(updateUserStatusSchema.body.safeParse({ active: "yes" }).success).toBe(false);
+    });
+  });
+
+  describe("updateUserRoleSchema", () => {
+    it("should accept each known role", () => {
+      for (const role of ["guest", "admin", "owner"]) {
+        expect(updateUserRoleSchema.body.safeParse({ role }).success).toBe(true);
+      }
+    });
+
+    it("should reject an unknown role", () => {
+      expect(updateUserRoleSchema.body.safeParse({ role: "superadmin" }).success).toBe(false);
+    });
   });
 });
