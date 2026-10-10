@@ -2,6 +2,7 @@ import createApp from "./app.js";
 import { checkDatabaseConnection, disconnectDatabase } from "./config/database.js";
 import env from "./config/env.js";
 import logger from "./config/logger.js";
+import { startBookingExpirationJob } from "./jobs/booking-expiration.job.js";
 import { startOtpCleanupJob } from "./jobs/otp-cleanup.job.js";
 import { startPriceCalendarJob } from "./jobs/price-calendar.job.js";
 import { refreshSettings } from "./cache/setting.store.js";
@@ -20,6 +21,11 @@ async function startServer(): Promise<void> {
   // جاب‌های دوره‌ای — بعد از اطمینان از اتصال دیتابیس.
   startOtpCleanupJob();
   startPriceCalendarJob();
+
+  //* لغو خودکار رزروهای `pending` که از مهلت پرداخت گذشته‌اند (هر دقیقه).
+  //* دیتابیس منبع حقیقت است؛ UI فقط «زمان مهلت» را نشان می‌دهد و لغو در
+  //* بازدید/رفرش بعدی دیده می‌شود.
+  startBookingExpirationJob();
 
   const server = app.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} [${env.NODE_ENV}]`);

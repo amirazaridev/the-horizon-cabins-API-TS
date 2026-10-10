@@ -558,9 +558,27 @@ describe.skipIf(!isIntegrationDbAvailable())("booking.routes (integration)", () 
   // GET /bookings/cabin/:cabinId/booked-dates
   // ==================================================================
   describe("GET /bookings/cabin/:cabinId/booked-dates", () => {
-    it("should require authentication", async () => {
+    /**
+     * این اندپوینت عمداً «عمومی» است (بدون احراز هویت): صفحه‌ی جزئیات کابین
+     * برای بازدیدکننده‌ی بدون ورود هم باید روزهای پرشده را غیرفعال کند، پس در
+     * `booking.route.ts` قبل از `router.use(protect)` ثبت شده است.
+     * تست قبلی انتظار ۴۰۱ داشت که با این طراحی ناسازگار بود.
+     */
+    it("is public — returns the booked ranges without authentication", async () => {
+      const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+      await createBooking({
+        cabinId,
+        guestId: guest.guestId!,
+        status: "confirmed",
+        startDate: start,
+        endDate: new Date(start.getTime() + 3 * 24 * 60 * 60 * 1000),
+      });
+
       const res = await request(app).get(`${BOOKINGS_PATH}/cabin/${cabinId}/booked-dates`);
-      expect(res.status).toBe(401);
+
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe("success");
+      expect(res.body.data.bookedDates).toHaveLength(1);
     });
 
     it("should return the booked ranges without from/to", async () => {
