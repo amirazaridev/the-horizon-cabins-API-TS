@@ -42,3 +42,18 @@ export type CabinPricing =
 
 /** کابین + شیء pricing در پاسخ لیست. */
 export type CabinWithPricing = CabinWithCity & { pricing: CabinPricing };
+
+/**
+ * یک پیشنهاد «تخفیف لحظه‌آخری» — کابینی که قاعده‌ی تخفیف فعالش امروز یا فردا
+ * منقضی می‌شود.
+ */
+export type LastMinuteCabin = CabinWithCity & {
+  /** قیمت نهایی شب تخفیف‌خورده (پس از تخفیف). */
+  finalPrice: number;
+  /** قیمت پیش از تخفیف (خط‌خورده در کارت). */
+  originalPrice: number;
+  /** درصد تخفیف اعمال‌شده روی آن شب. */
+  discountPercent: number;
+  /** لحظه‌ی انقضای تخفیف (ISO) — مبنای تایمر سمت کلاینت. */
+  expiresAt: string;
+};

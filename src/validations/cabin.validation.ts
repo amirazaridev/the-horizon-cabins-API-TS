@@ -4,7 +4,7 @@ import { safeNumber } from "../utils/safeParseNumber.js";
 import { safeArray } from "../utils/safeArray.js";
 import { TIMEZONE } from "../constants/booking.constants.js";
 import { addDaysUtc, todayInTimezone } from "../utils/date.util.js";
-import { dateOnlySchema } from "./shared.validation.js";
+import { dateOnlySchema, limitQuerySchema } from "./shared.validation.js";
 import type { AppSettings } from "../types/setting.types.js";
 import { CABIN_SORT_VALUES } from "../utils/cabin-sort.util.js";
 
@@ -402,3 +402,8 @@ export const deleteCabinSchema = {
 export const listCabinsQueryValidation = (settings: AppSettings) => ({
   query: buildCabinQuerySchema(settings),
 });
+
+/** کوئری پیشنهادهای تخفیف لحظه‌آخری — فقط `limit` (پیش‌فرض ۵، حداکثر ۲۰). */
+export const lastMinuteQueryValidation = {
+  query: limitQuerySchema(5, 20),
+};

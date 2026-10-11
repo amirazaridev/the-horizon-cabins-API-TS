@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { todayInTimezone, nightsBetween, addDaysUtc, isoWeekday } from "../../../src/utils/date.util.js";
+import {
+  todayInTimezone,
+  nightsBetween,
+  addDaysUtc,
+  isoWeekday,
+  endOfTehranDayUtc,
+} from "../../../src/utils/date.util.js";
 
 describe("date.util", () => {
   describe("todayInTimezone", () => {
@@ -135,6 +141,22 @@ describe("date.util", () => {
       // یک لحظه‌ی اواخر شب UTC که در تهران روز بعد است؛ چون تاریخ همیشه
       // نیمه‌شب UTC است، روز هفته باید از خودِ مقدار UTC محاسبه شود.
       expect(isoWeekday(new Date("2026-01-07T00:00:00.000Z"))).toBe(3);
+    });
+  });
+
+  describe("endOfTehranDayUtc", () => {
+    it("should return the next Tehran midnight as a UTC instant", () => {
+      // پایان روز ۲۰۲۶-۱۰-۰۳ به وقت تهران = ۲۰۲۶-۱۰-۰۴T00:00 تهران
+      // = ۲۰۲۶-۱۰-۰۳T20:30 UTC.
+      expect(endOfTehranDayUtc(new Date("2026-10-03T00:00:00.000Z")).toISOString()).toBe(
+        "2026-10-03T20:30:00.000Z",
+      );
+    });
+
+    it("should be exactly 24h after the previous day's expiry", () => {
+      const day1 = endOfTehranDayUtc(new Date("2026-10-03T00:00:00.000Z"));
+      const day2 = endOfTehranDayUtc(new Date("2026-10-04T00:00:00.000Z"));
+      expect(day2.getTime() - day1.getTime()).toBe(86_400_000);
     });
   });
 });

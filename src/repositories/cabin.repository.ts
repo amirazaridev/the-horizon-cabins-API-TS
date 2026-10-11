@@ -1,13 +1,15 @@
 import { prisma, PrismaTransactionClient } from "../config/database.js";
 import { Prisma } from "../generated/prisma/client.js";
 import type { Cabin } from "../generated/prisma/client.js";
-import { CabinFilters, CabinWithCity } from "../types/cabin.types.js";
+import { CabinFilters, CabinWithCity, LastMinuteCabin } from "../types/cabin.types.js";
 import {
   enrichWithStartingPrice,
   findAllCabinsWithPricing,
   needsPricingPath,
 } from "./cabin-search.repository.js";
 import { cabinOrderBy } from "../utils/cabin-sort.util.js";
+import { addDaysUtc, endOfTehranDayUtc, todayInTimezone } from "../utils/date.util.js";
+import { TIMEZONE } from "../constants/booking.constants.js";
 import { DEFAULT_SETTINGS } from "../constants/setting.constants.js";
 
 type Db = typeof prisma | PrismaTransactionClient;
@@ -165,4 +167,103 @@ export async function countCabinsOutsidePriceRange(
   return db.cabin.count({
     where: { OR: [{ regularPrice: { lt: min } }, { regularPrice: { gt: max } }] },
   });
+}
+
+/**
+ * پیشنهادهای «تخفیف لحظه‌آخری» برای سکشن لندینگ.
+ *
+ * منطق انتخاب: قاعده‌ی تخفیف فعال از نوع `dateRange` که **شروعش رسیده**
+ * (`startDate <= today`) و **امروز یا فردا منقضی می‌شود**
+ * (`endDate ∈ [today, today+1]`). تخفیف‌هایی که از فردا شروع می‌شوند وارد
+ * نمی‌شوند (تصمیم پروژه).
+ *
+ * قیمت هر کارت از read-model `CabinDailyPrice` (نزدیک‌ترین شب تخفیف‌خورده)
+ * می‌آید و `expiresAt` لحظه‌ی پایان روزِ `endDate` به وقت تهران است.
+ * خروجی بر اساس نزدیک‌ترین انقضا مرتب می‌شود.
+ */
+export async function findLastMinuteCabins(limit: number): Promise<LastMinuteCabin[]> {
+  const today = todayInTimezone(TIMEZONE);
+  const tomorrow = addDaysUtc(today, 1);
+
+  //* ۱. قواعد تخفیف فعالی که امروز/فردا منقضی می‌شوند.
+  const rules = await prisma.priceRule.findMany({
+    where: {
+      type: "discount",
+      kind: "dateRange",
+      isActive: true,
+      startDate: { lte: today },
+      endDate: { gte: today, lte: tomorrow },
+    },
+    select: { cabinId: true, startDate: true, endDate: true, percent: true },
+    orderBy: [{ endDate: "asc" }, { percent: "desc" }, { cabinId: "asc" }],
+  });
+
+  if (rules.length === 0) return [];
+
+  //* ۲. برای هر کابین نزدیک‌ترین قاعده (کوچک‌ترین endDate) را نگه می‌داریم.
+  const nearestByCabin = new Map<number, { endDate: Date; percent: number }>();
+  for (const rule of rules) {
+    if (rule.startDate === null || rule.endDate === null) continue;
+    if (!nearestByCabin.has(rule.cabinId)) {
+      nearestByCabin.set(rule.cabinId, { endDate: rule.endDate, percent: rule.percent });
+    }
+  }
+
+  //* ۳. مرتب بر اساس نزدیک‌ترین انقضا و برش به `limit`.
+  const selected = [...nearestByCabin.entries()]
+    .sort((a, b) => a[1].endDate.getTime() - b[1].endDate.getTime() || a[0] - b[0])
+    .slice(0, limit);
+
+  if (selected.length === 0) return [];
+
+  const cabinIds = selected.map(([cabinId]) => cabinId);
+
+  //* ۴. کابین‌ها و قیمت شب‌های تخفیف‌خورده را یک‌جا می‌گیریم (بدون N+1).
+  const [cabins, priceRows] = await Promise.all([
+    prisma.cabin.findMany({ where: { id: { in: cabinIds } }, ...cabinInclude }),
+    prisma.cabinDailyPrice.findMany({
+      where: {
+        cabinId: { in: cabinIds },
+        date: { gte: today, lte: tomorrow },
+        discountPercent: { gt: 0 },
+      },
+      orderBy: { date: "asc" },
+    }),
+  ]);
+
+  const cabinById = new Map((cabins as CabinWithCity[]).map((cabin) => [cabin.id, cabin]));
+
+  //* ترتیب صعودی تاریخ ⇒ اولین ردیف هر کابین «نزدیک‌ترین شب تخفیف‌خورده» است.
+  const priceByCabin = new Map<number, { basePrice: number; finalPrice: number; discountPercent: number }>();
+  for (const row of priceRows) {
+    if (!priceByCabin.has(row.cabinId)) {
+      priceByCabin.set(row.cabinId, {
+        basePrice: row.basePrice,
+        finalPrice: row.finalPrice,
+        discountPercent: row.discountPercent,
+      });
+    }
+  }
+
+  const result: LastMinuteCabin[] = [];
+  for (const [cabinId, rule] of selected) {
+    const cabin = cabinById.get(cabinId);
+    if (!cabin) continue;
+
+    const price = priceByCabin.get(cabinId);
+    //* اگر تقویم قیمت ساخته نشده باشد، تخفیف درصدی را دستی اعمال می‌کنیم.
+    const originalPrice = price?.basePrice ?? cabin.regularPrice;
+    const finalPrice =
+      price?.finalPrice ?? Math.floor((originalPrice * (100 - rule.percent)) / 100);
+
+    result.push({
+      ...cabin,
+      originalPrice,
+      finalPrice,
+      discountPercent: price?.discountPercent ?? rule.percent,
+      expiresAt: endOfTehranDayUtc(rule.endDate).toISOString(),
+    });
+  }
+
+  return result;
 }
