@@ -6,7 +6,7 @@ import type { createCitySchema, updateCitySchema } from "../validations/location
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import { Prisma } from "../generated/prisma/client.js";
-import type { CityWithRegion, RegionWithCitiesCount } from "../types/location.types.js";
+import type { CityWithRegion, PopularCity, RegionWithCitiesCount } from "../types/location.types.js";
 
 type CreateCityInput = z.infer<typeof createCitySchema.body>;
 type UpdateCityInput = z.infer<typeof updateCitySchema.body>;
@@ -52,6 +52,14 @@ export async function getRegionCities(regionId: number): Promise<City[]> {
 
 export async function getAllCities(): Promise<CityWithRegion[]> {
   return locationRepository.findAllCities();
+}
+
+/**
+ * شهرهای پرطرفدار برای لندینگ — مرتب بر اساس بیشترین تعداد رزرو.
+ * `limit` از اعتبارسنجی مسیر می‌آید (پیش‌فرض ۸).
+ */
+export async function getPopularCities(limit: number): Promise<PopularCity[]> {
+  return locationRepository.findPopularCities(limit);
 }
 
 export async function createCity(input: CreateCityInput): Promise<City> {
