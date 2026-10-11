@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import * as locationService from "../services/location.service.js";
 import { sendSuccess } from "../utils/apiResponse.js";
+import { getQuery } from "../utils/request.util.js";
 
 export async function getRegions(_req: Request, res: Response): Promise<void> {
   const regions = await locationService.getAllRegions();
@@ -15,6 +16,13 @@ export async function getRegionCities(req: Request, res: Response): Promise<void
 
 export async function getCities(_req: Request, res: Response): Promise<void> {
   const cities = await locationService.getAllCities();
+  sendSuccess(res, { data: { cities } });
+}
+
+/** شهرهای پرطرفدار (سکشن لندینگ) — `?limit=` اختیاری. */
+export async function getPopularCities(req: Request, res: Response): Promise<void> {
+  const { limit } = getQuery<{ limit: number }>(req);
+  const cities = await locationService.getPopularCities(limit);
   sendSuccess(res, { data: { cities } });
 }
 

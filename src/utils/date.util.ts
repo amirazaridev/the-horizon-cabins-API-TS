@@ -37,3 +37,17 @@ export function isoWeekday(date: Date): number {
   const day = date.getUTCDay();
   return day === 0 ? 7 : day;
 }
+
+/** آفست ثابت تهران (+۰۳:۳۰). ایران از ۲۰۲۲ ساعت تابستانی ندارد. */
+const TEHRAN_OFFSET_MS = 3.5 * 60 * 60 * 1000;
+
+/**
+ * لحظه‌ی پایان یک روز تقویمی به وقت تهران، به‌صورت UTC.
+ *
+ * ورودی یک تاریخ نیمه‌شب-UTC (هم‌شکل ستون‌های `DATE`) است؛ خروجی لحظه‌ی
+ * شروع روز بعد به وقت تهران (= انقضای قواعد آن روز) برمی‌گردد. برای تایمر
+ * «لحظه‌ی آخری» استفاده می‌شود.
+ */
+export function endOfTehranDayUtc(date: Date): Date {
+  return new Date(addDaysUtc(date, 1).getTime() - TEHRAN_OFFSET_MS);
+}

@@ -24,6 +24,13 @@ export async function getAllAmenities(req: Request, res: Response) {
   sendSuccess(res, { data: { amenities } });
 }
 
+/** پیشنهادهای تخفیف لحظه‌آخری — `?limit=` اختیاری (پیش‌فرض ۵). */
+export async function getLastMinute(req: Request, res: Response): Promise<void> {
+  const { limit } = getQuery<{ limit: number }>(req);
+  const cabins = await cabinService.getLastMinuteCabins(limit);
+  sendSuccess(res, { data: { cabins } });
+}
+
 export async function getCabin(req: Request, res: Response): Promise<void> {
   const id = getIntParam(req, "id");
   const cabin = await cabinService.getCabinById(id);

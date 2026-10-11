@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { safeNumber } from "../utils/safeParseNumber.js";
+import { limitQuerySchema } from "./shared.validation.js";
 
 // -------------------------------------
 // Helpers
@@ -37,6 +38,9 @@ const regionIdParamsSchema = z.object({
   regionId: z.string().regex(/^\d+$/, { message: "Region ID must be a number" }).transform(Number),
 });
 
+/** کوئری شهرهای پرطرفدار — `limit` اختیاری (پیش‌فرض ۸، حداکثر ۵۰). */
+const popularCitiesQuerySchema = limitQuerySchema(8);
+
 // -------------------------------------
 // Exported Validations
 // -------------------------------------
@@ -56,4 +60,8 @@ export const deleteCitySchema = {
 
 export const regionCitiesSchema = {
   params: regionIdParamsSchema,
+};
+
+export const popularCitiesSchema = {
+  query: popularCitiesQuerySchema,
 };

@@ -30,6 +30,11 @@ router
     locationController.createCity,
   );
 
+//? شهرهای پرطرفدار (سکشن لندینگ) — عمومی. باید قبل از مسیر پارامتری ثبت شود.
+router
+  .route("/cities/popular")
+  .get(validate(locationValidation.popularCitiesSchema), locationController.getPopularCities);
+
 router
   .route("/cities/:id")
   .patch(

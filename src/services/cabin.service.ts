@@ -8,7 +8,7 @@ import { getPaginationMeta } from "../utils/pagination.utils.js";
 import { ErrorCode } from "../constants/errorCodes.js";
 import { HTTP_STATUS } from "../constants/httpStatus.js";
 import type { PaginatedResult } from "../types/pagination.types.js";
-import { CabinFilters, CabinWithPricing } from "../types/cabin.types.js";
+import { CabinFilters, CabinWithPricing, LastMinuteCabin } from "../types/cabin.types.js";
 import { prisma } from "../config/database.js";
 import { rebuildCabinPriceCalendar } from "./price-calendar.service.js";
 import { currentSettings } from "../cache/setting.store.js";
@@ -40,6 +40,14 @@ export async function getAllCabins(
 
 export async function getAllAmenities(): Promise<string[]> {
   return await cabinRepository.findAllAmenities();
+}
+
+/**
+ * پیشنهادهای تخفیف لحظه‌آخری (تخفیف‌هایی که امروز/فردا منقضی می‌شوند).
+ * `limit` از اعتبارسنجی مسیر می‌آید (پیش‌فرض ۵).
+ */
+export async function getLastMinuteCabins(limit: number): Promise<LastMinuteCabin[]> {
+  return cabinRepository.findLastMinuteCabins(limit);
 }
 
 export async function getCabinById(id: number): Promise<Cabin> {

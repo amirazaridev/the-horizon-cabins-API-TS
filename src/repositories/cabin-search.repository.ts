@@ -1,8 +1,14 @@
 import { prisma } from "../config/database.js";
 import { Prisma } from "../generated/prisma/client.js";
-import { CabinFilters, CabinSort, CabinWithCity, CabinWithPricing } from "../types/cabin.types.js";
-import { OCCUPYING_STATUSES, BOOKING_STATUS_DB, TIMEZONE } from "../constants/booking.constants.js";
+import { CabinFilters, CabinWithCity, CabinWithPricing } from "../types/cabin.types.js";
+import {
+  OCCUPYING_STATUSES,
+  BOOKING_STATUS_DB,
+  RANKING_STATUS_SQL_LIST,
+  TIMEZONE,
+} from "../constants/booking.constants.js";
 import { addDaysUtc, nightsBetween, todayInTimezone } from "../utils/date.util.js";
+import { cabinOrderBySql, isBookingCountSort, needsRawSortPath } from "../utils/cabin-sort.util.js";
 
 /**
  * کوئری‌های raw مربوط به قیمت‌گذاری کابین‌ها (لیست/فیلتر/مرتب‌سازی روی
@@ -14,6 +20,25 @@ import { addDaysUtc, nightsBetween, todayInTimezone } from "../utils/date.util.j
 const OCCUPYING_STATUS_SQL = Prisma.raw(
   OCCUPYING_STATUSES.map((status) => `'${BOOKING_STATUS_DB[status]}'`).join(", "),
 );
+
+const RANKING_STATUS_SQL = Prisma.raw(RANKING_STATUS_SQL_LIST);
+
+/**
+ * زیرکوئری شمارش رزرو هر کابین (برای سورت `most_booked`).
+ *
+ * وضعیت‌های شمرده‌شده: `confirmed` + `checkedIn` + `checkedOut` (رزروهای
+ * واقعی‌شده)؛ `pending` و `cancelled` شمرده نمی‌شوند. یک ردیف به‌ازای هر کابین
+ * برمی‌گرداند تا LEFT JOIN آن تعداد ردیف‌ها را چند برابر نکند (COUNT(*) OVER()
+ * سالم بماند).
+ */
+const BOOKING_COUNT_JOIN = Prisma.sql`
+  LEFT JOIN (
+    SELECT b."cabin_id" AS id, COUNT(*)::int AS "bookingCount"
+    FROM "bookings" AS b
+    WHERE b."status" IN (${RANKING_STATUS_SQL})
+    GROUP BY b."cabin_id"
+  ) AS bc ON bc.id = c."id"
+`;
 
 const cabinInclude = {
   omit: { cityId: true },
@@ -28,7 +53,7 @@ export function needsPricingPath(filters?: CabinFilters): boolean {
     filters.endDate !== undefined ||
     filters.price !== undefined ||
     filters.totalPrice !== undefined ||
-    filters.sort !== undefined
+    needsRawSortPath(filters.sort)
   );
 }
 
@@ -61,17 +86,20 @@ export async function findAllCabinsWithPricing(params: {
 
   if (candidateIds.length === 0) return { data: [], total: 0 };
 
-  //* ترتیب نهایی: پیش‌فرض id ASC؛ در حالت sort=price_* بر اساس قیمت.
-  const sort: CabinSort | undefined = filters.sort;
-  const orderByPrice =
-    sort === "price_asc"
-      ? Prisma.sql`ORDER BY "sortPrice" ASC NULLS LAST, c."id" ASC`
-      : sort === "price_desc"
-        ? Prisma.sql`ORDER BY "sortPrice" DESC NULLS LAST, c."id" ASC`
-        : Prisma.sql`ORDER BY c."id" ASC`;
+  //* ترتیب نهایی از util مشترک سورت می‌آید (قیمت / تعداد رزرو / ستون).
+  const orderByPrice = cabinOrderBySql(filters.sort);
+  const withBookingCount = isBookingCountSort(filters.sort);
 
   const result = stayMode
-    ? await queryStayPricing({ candidateIds, filters, now, skip, limit, orderByPrice })
+    ? await queryStayPricing({
+        candidateIds,
+        filters,
+        now,
+        skip,
+        limit,
+        orderByPrice,
+        withBookingCount,
+      })
     : await queryStartingPrice({
         candidateIds,
         filters,
@@ -79,6 +107,7 @@ export async function findAllCabinsWithPricing(params: {
         skip,
         limit,
         orderByPrice,
+        withBookingCount,
         startingPriceWindowDays,
       });
 
@@ -126,6 +155,8 @@ interface PricingRow {
   id: number;
   sortPrice: number | null;
   nights: number | null;
+  /** فقط در سورت `most_booked` انتخاب می‌شود (برای ORDER BY). */
+  bookingCount?: number | null;
 }
 
 /** حالت اقامت (با تاریخ): totalPrice = SUM(finalPrice) روی شب‌های اقامت. */
@@ -136,12 +167,18 @@ async function queryStayPricing(params: {
   skip: number;
   limit: number;
   orderByPrice: Prisma.Sql;
+  withBookingCount: boolean;
 }): Promise<{ rows: PricingRow[]; total: number }> {
-  const { candidateIds, filters, now, skip, limit, orderByPrice } = params;
+  const { candidateIds, filters, now, skip, limit, orderByPrice, withBookingCount } = params;
   const startDate = filters.startDate!;
   const endDate = filters.endDate!;
   const nights = nightsBetween(startDate, endDate);
   const lastNight = addDaysUtc(endDate, -1);
+
+  const bookingCountSelect = withBookingCount
+    ? Prisma.sql`, COALESCE(bc."bookingCount", 0)::int AS "bookingCount"`
+    : Prisma.empty;
+  const bookingCountJoin = withBookingCount ? BOOKING_COUNT_JOIN : Prisma.empty;
 
   //* فیلتر قیمت شبانه‌ی میانگین: total >= min*nights AND total <= max*nights
   const priceFilter = filters.price
@@ -165,9 +202,10 @@ async function queryStayPricing(params: {
       GROUP BY p."cabin_id"
       HAVING COUNT(*) = ${nights}
     )
-    SELECT s.id, s."sortPrice", s.nights, COUNT(*) OVER() AS "totalCount"
+    SELECT s.id, s."sortPrice", s.nights, COUNT(*) OVER() AS "totalCount" ${bookingCountSelect}
     FROM stay AS s
     JOIN "cabins" AS c ON c."id" = s.id
+    ${bookingCountJoin}
     WHERE NOT EXISTS (
         SELECT 1 FROM "bookings" AS b
         WHERE b."cabin_id" = c."id"
@@ -196,11 +234,25 @@ async function queryStartingPrice(params: {
   skip: number;
   limit: number;
   orderByPrice: Prisma.Sql;
+  withBookingCount: boolean;
   startingPriceWindowDays: number;
 }): Promise<{ rows: PricingRow[]; total: number }> {
-  const { candidateIds, filters, today, skip, limit, orderByPrice, startingPriceWindowDays } =
-    params;
+  const {
+    candidateIds,
+    filters,
+    today,
+    skip,
+    limit,
+    orderByPrice,
+    withBookingCount,
+    startingPriceWindowDays,
+  } = params;
   const windowEnd = addDaysUtc(today, startingPriceWindowDays - 1);
+
+  const bookingCountSelect = withBookingCount
+    ? Prisma.sql`, COALESCE(bc."bookingCount", 0)::int AS "bookingCount"`
+    : Prisma.empty;
+  const bookingCountJoin = withBookingCount ? BOOKING_COUNT_JOIN : Prisma.empty;
 
   //* فیلتر قیمت بدون تاریخ روی startingPrice.
   const priceFilter = filters.price
@@ -218,9 +270,10 @@ async function queryStartingPrice(params: {
         AND p."date" <= ${windowEnd}::date
       GROUP BY p."cabin_id"
     )
-    SELECT c."id" AS id, s."sortPrice", NULL::int AS nights, COUNT(*) OVER() AS "totalCount"
+    SELECT c."id" AS id, s."sortPrice", NULL::int AS nights, COUNT(*) OVER() AS "totalCount" ${bookingCountSelect}
     FROM "cabins" AS c
     LEFT JOIN starting AS s ON s.id = c."id"
+    ${bookingCountJoin}
     WHERE c."id" = ANY(${candidateIds})
       ${priceFilter}
     ${orderByPrice}

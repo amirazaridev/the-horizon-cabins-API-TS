@@ -27,6 +27,13 @@ router
   .post(...requireCabinAdmin, cabinController.createCabin);
 router.route("/amenities").get(cabinController.getAllAmenities);
 
+//? پیشنهادهای تخفیف لحظه‌آخری (عمومی) — باید قبل از مسیر پارامتری `/:id` ثبت شود.
+router.get(
+  "/last-minute",
+  validate(cabinValidation.lastMinuteQueryValidation),
+  cabinController.getLastMinute,
+);
+
 //? تقویم قیمت یک کابین (عمومی).
 router.get(
   "/:cabinId/price-calendar",

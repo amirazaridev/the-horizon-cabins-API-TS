@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { safeNumber } from "../utils/safeParseNumber.js";
+
 /**
  * اعتبارسنجی‌های مشترک بین ماژول‌ها.
  *
@@ -27,6 +29,21 @@ export const idParamsSchema = z.object({
 export const cabinIdParamsSchema = z.object({
   cabinId: z.string().regex(/^\d+$/, { message: "ID must be a number" }).transform(Number),
 });
+
+/**
+ * اسکیمای کوئری `limit` برای اندپوینت‌های «فهرست منتخب» (بدون صفحه‌بندی).
+ *
+ * `limit` اختیاری است؛ نبودش ⇒ `defaultLimit`، و همیشه به `maxLimit` محدود
+ * می‌شود تا یک کلاینت نتواند کل جدول را بکشد.
+ */
+export function limitQuerySchema(defaultLimit: number, maxLimit = 50) {
+  return z.object({
+    limit: z.preprocess(
+      safeNumber,
+      z.number().int().min(1).max(maxLimit).default(defaultLimit),
+    ),
+  });
+}
 
 /** پارس امن boolean از query string ("true"/"false"/"1"/"0"). */
 export function safeBoolean(value: unknown): unknown {
