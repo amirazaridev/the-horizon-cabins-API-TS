@@ -7,6 +7,7 @@ import {
   findAllCabinsWithPricing,
   needsPricingPath,
 } from "./cabin-search.repository.js";
+import { cabinOrderBy } from "../utils/cabin-sort.util.js";
 import { DEFAULT_SETTINGS } from "../constants/setting.constants.js";
 
 type Db = typeof prisma | PrismaTransactionClient;
@@ -85,6 +86,9 @@ export async function findAllCabins({
       where,
       skip,
       take: limit,
+      //* سورت‌های ستون‌محور (`newest`/`rating_desc`) در همین مسیر اعمال می‌شوند؛
+      //* سورت‌های قیمت/تعداد رزرو به مسیر خام می‌روند (needsPricingPath).
+      orderBy: cabinOrderBy(filters?.sort),
       ...cabinInclude,
     }),
     prisma.cabin.count({ where }),

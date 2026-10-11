@@ -6,6 +6,7 @@ import { TIMEZONE } from "../constants/booking.constants.js";
 import { addDaysUtc, todayInTimezone } from "../utils/date.util.js";
 import { dateOnlySchema } from "./shared.validation.js";
 import type { AppSettings } from "../types/setting.types.js";
+import { CABIN_SORT_VALUES } from "../utils/cabin-sort.util.js";
 
 import { paginationQueryValidation } from "./pagination.validation.js";
 import { categorySlugQueryValidation } from "./category.validation.js";
@@ -273,7 +274,7 @@ const cabinFiltersSchema = z.object({
 
   endDate: dateOnlySchema.optional(),
 
-  sort: z.enum(["price_asc", "price_desc"]).optional(),
+  sort: z.enum(CABIN_SORT_VALUES).optional(),
 
   cityId: optionalPositiveInt("City ID"),
 

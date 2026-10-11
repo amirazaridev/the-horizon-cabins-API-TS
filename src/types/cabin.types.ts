@@ -10,7 +10,15 @@ export interface PriceRange {
   max: number;
 }
 
-export type CabinSort = "price_asc" | "price_desc";
+/**
+ * مقادیر مجاز مرتب‌سازی لیست کابین‌ها.
+ *
+ *  - `price_asc` / `price_desc` → بر پایه‌ی قیمت مؤثر (پس از تخفیف/افزایش).
+ *  - `newest`                   → جدیدترین کابین ثبت‌شده (`createdAt` نزولی).
+ *  - `most_booked`              → بیشترین تعداد رزرو.
+ *  - `rating_desc`              → بیشترین امتیاز.
+ */
+export type CabinSort = "price_asc" | "price_desc" | "newest" | "most_booked" | "rating_desc";
 
 export interface CabinFilters {
   guests?: number;
