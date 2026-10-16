@@ -400,6 +400,7 @@ The seed system (`prisma/seed.ts`) populates:
 - **10 categories** (Cabin, Villa, Apartment, Traditional House, Forest Villa, Luxury Stay, Swiss Cabin, Seaside, With Pool, Rural House)
 - **10 cabins** with full details (Persian descriptions, amenities, Supabase image URLs, coordinates, pricing)
 - **20 cabin-category** relationships
+- **3 base accounts** — `owner@horizon.local` (owner), `admin@horizon.local` (admin), and `guest@horizon.local` (guest, with a linked `guests` profile); all share the dev password `12345678`. Seeded before the price rules, since the owner is the actor referenced by `createdBy`/`updatedBy`.
 
 ---
 

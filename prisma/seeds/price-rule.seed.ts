@@ -3,38 +3,8 @@ import { todayInTimezone } from "../../src/utils/date.util";
 import { TIMEZONE } from "../../src/constants/booking.constants";
 import { buildSamplePriceRules } from "./data/price-rule";
 
-/** ایمیل کاربر owner داده‌ی seed. */
-export const SEED_OWNER_EMAIL = "owner@horizon.local";
-/** رمز عبور پیش‌فرض owner داده‌ی seed (فقط محیط توسعه). */
-export const SEED_OWNER_PASSWORD = "HorizonOwner123!";
 
-/**
- * ساخت (یا یافتن) کاربر owner که قواعد نمونه به او نسبت داده می‌شوند.
- *
- * از `prisma.user.create` استفاده می‌کنیم (نه upsert) تا extension هش‌کردن
- * رمز عبور فعال شود؛ upsert توسط extension گرفته نمی‌شود.
- */
-export async function seedOwnerUser(): Promise<number> {
-  const existing = await prisma.user.findUnique({ where: { email: SEED_OWNER_EMAIL } });
-  if (existing) return existing.id;
-
-  const owner = await prisma.user.create({
-    data: {
-      email: SEED_OWNER_EMAIL,
-      password: SEED_OWNER_PASSWORD,
-      role: "owner",
-      active: true,
-    },
-  });
-  return owner.id;
-}
-
-/**
- * جایگزینی قواعد نمونه‌ی قیمت‌گذاری. idempotent است: قواعد و history قبلی
- * پاک و از نو ساخته می‌شوند (داده‌ی dev است).
- */
-export async function seedPriceRules(): Promise<number> {
-  const ownerId = await seedOwnerUser();
+export async function seedPriceRules(ownerId: number): Promise<number> {
   const today = todayInTimezone(TIMEZONE);
   const samples = buildSamplePriceRules(today);
 

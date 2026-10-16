@@ -5,6 +5,7 @@ import { seedCabins } from "./seeds/cabin.seed";
 import { seedCities } from "./seeds/city.seed";
 import { seedCategories } from "./seeds/category.seed";
 import { seedCabinCategories } from "./seeds/cabin-category.seed";
+import { seedUsers } from "./seeds/user.seed";
 import { seedPriceRules } from "./seeds/price-rule.seed";
 import { rebuildAllCabinPriceCalendars } from "../src/services/price-calendar.service";
 
@@ -32,7 +33,10 @@ async function main() {
   await seedCabins();
   await seedCabinCategories();
 
-  const ruleCount = await seedPriceRules();
+
+  const { owner: ownerId } = await seedUsers();
+
+  const ruleCount = await seedPriceRules(ownerId);
   const calendarRows = await rebuildAllCabinPriceCalendars();
 
   await syncSequences(["regions", "cities", "categories", "cabins"]);
